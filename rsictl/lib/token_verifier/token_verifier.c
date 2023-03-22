@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include <libcflat.h>
+#include <stdio.h>
 #include <inttypes.h>
 #include <qcbor/qcbor_decode.h>
 #include <qcbor/qcbor_spiffy_decode.h>
@@ -14,6 +14,8 @@
 
 #define SHA256_SIZE 32
 #define SHA512_SIZE 64
+
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
 
 #define RETURN_ON_DECODE_ERROR(p_context) \
 	do { \
@@ -167,7 +169,7 @@ static int get_claims_from_map(QCBORDecodeContext *p_context,
 {
 	QCBORError err;
 	int token_verification_error;
-	int i;
+	unsigned i;
 
 	for (i = 0; i < num_of_claims; ++i) {
 		struct claim_t *claim = claims + i;
@@ -259,7 +261,7 @@ static int get_claims(QCBORDecodeContext *p_context, struct claim_t *claims,
 		      size_t num_of_claims)
 {
 	QCBORError err;
-	int i;
+	unsigned i;
 
 	for (i = 0; i < num_of_claims; ++i) {
 		struct claim_t *claim = claims + i;
@@ -348,7 +350,7 @@ static int verify_platform_token(struct q_useful_buf_c buf,
 static bool verify_length_of_measurement(size_t len)
 {
 	size_t allowed_lengths[] = {SHA256_SIZE, SHA512_SIZE};
-	int i;
+	unsigned i;
 
 	for (i = 0; i < ARRAY_SIZE(allowed_lengths); ++i) {
 		if (len == allowed_lengths[i])
@@ -588,4 +590,3 @@ int verify_token(const char *token, size_t size,
 
 	return TOKEN_VERIFICATION_ERR_SUCCESS;
 }
-

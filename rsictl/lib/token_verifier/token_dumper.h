@@ -10,6 +10,6 @@
 #include "token_verifier.h"
 
 void print_raw_token(const char *token, size_t size);
-void print_token(struct attestation_claims *claims);
+void print_token(const struct attestation_claims *claims);
 
 #endif /* __TOKEN_DUMPER_H__ */

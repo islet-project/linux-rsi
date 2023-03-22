@@ -13,7 +13,7 @@
 
 void print_raw_token(const char *token, size_t size)
 {
-	int i;
+	unsigned i;
 	char byte;
 
 	printf("\r\nCopy paste token to www.cbor.me\r\n");
@@ -41,7 +41,7 @@ static void print_indent(int indent_level)
 static void print_byte_string(const char *name, int index,
 			      struct q_useful_buf_c buf)
 {
-	int i;
+	unsigned i;
 
 	printf("%-"COLUMN_WIDTH"s (#%d) = [", name, index);
 	for (i = 0; i < buf.len; ++i) {
@@ -52,7 +52,7 @@ static void print_byte_string(const char *name, int index,
 
 static void print_text(const char *name, int index, struct q_useful_buf_c buf)
 {
-	int i;
+	unsigned i;
 
 	printf("%-"COLUMN_WIDTH"s (#%d) = \"", name, index);
 	for (i = 0; i < buf.len; ++i) {
@@ -61,7 +61,7 @@ static void print_text(const char *name, int index, struct q_useful_buf_c buf)
 	printf("\"\r\n");
 }
 
-static void print_claim(struct claim_t *claim, int indent_level)
+static void print_claim(const struct claim_t *claim, int indent_level)
 {
 	print_indent(indent_level);
 	if (claim->present) {
@@ -97,7 +97,7 @@ static void print_claim(struct claim_t *claim, int indent_level)
 }
 
 static void print_cose_sign1_wrapper(const char *token_type,
-				     struct claim_t *cose_sign1_wrapper)
+				     const struct claim_t *cose_sign1_wrapper)
 {
 	printf("\r\n== %s Token cose header:\r\n", token_type);
 	print_claim(cose_sign1_wrapper + 0, 0);
@@ -106,7 +106,7 @@ static void print_cose_sign1_wrapper(const char *token_type,
 	printf("== End of %s Token cose header\r\n\r\n", token_type);
 }
 
-void print_token(struct attestation_claims *claims)
+void print_token(const struct attestation_claims *claims)
 {
 	int i;
 
@@ -117,7 +117,7 @@ void print_token(struct attestation_claims *claims)
 	 * below.
 	 */
 	for (i = 0; i < CLAIM_COUNT_REALM_TOKEN; ++i) {
-		struct claim_t *claim = claims->realm_token_claims + i;
+		const struct claim_t *claim = claims->realm_token_claims + i;
 
 		print_claim(claim, 0);
 	}
@@ -125,7 +125,7 @@ void print_token(struct attestation_claims *claims)
 	printf("%-"COLUMN_WIDTH"s (#%d)\r\n", "Realm measurements",
 		CCA_REALM_EXTENSIBLE_MEASUREMENTS);
 	for (i = 0; i < CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS; ++i) {
-		struct claim_t *claim = claims->realm_measurement_claims + i;
+		const struct claim_t *claim = claims->realm_measurement_claims + i;
 
 		print_claim(claim, 1);
 	}
@@ -135,7 +135,7 @@ void print_token(struct attestation_claims *claims)
 
 	printf("\r\n== Platform Token:\r\n");
 	for (i = 0; i < CLAIM_COUNT_PLATFORM_TOKEN; ++i) {
-		struct claim_t *claim = claims->plat_token_claims + i;
+		const struct claim_t *claim = claims->plat_token_claims + i;
 
 		print_claim(claim, 0);
 	}
@@ -144,7 +144,7 @@ void print_token(struct attestation_claims *claims)
 	printf("\r\n== Platform Token SW components:\r\n");
 
 	for (i = 0; i < MAX_SW_COMPONENT_COUNT; ++i) {
-		struct sw_component_t *component =
+		const struct sw_component_t *component =
 			claims->sw_component_claims + i;
 
 		if (component->present) {
