@@ -8,10 +8,14 @@ export SHARED_DIR := ${up_dir}/fvp-cca-scripts/out/shared_dir
 export CROSS_COMPILE := aarch64-none-linux-gnu-
 export ARCH := arm64
 
+CMDLINE=rsictl
+HEADERS=rsi.h
 
 obj-m += rsi.o
 
-all:
+all: module
+
+module: ${HEADERS}
 	make -C ${KERNEL_DIR} M=$(PWD) modules
 	cp rsi.ko ${SHARED_DIR}
 
