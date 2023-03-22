@@ -13,6 +13,19 @@ const SOURCE_FILES: [&str; 7] = [
     "lib/token_verifier/token_verifier.c",
 ];
 
+const HEADER_FILES: [&str; 3] = [
+    "lib/token_verifier/attest_defines.h",
+    "lib/token_verifier/token_dumper.h",
+    "lib/token_verifier/token_verifier.h",
+];
+
+// this is required for stupid clang that can't find gcc headers
+const BINGDEN_ARGS: [&str; 3] = [
+    "-I/usr/include/x86_64-linux-gnu",
+    "-D__x86_64__",
+    "-D__LP64__",
+];
+
 fn main()
 {
     // get rid of cross_compile leftover from kernel,
@@ -34,4 +47,19 @@ fn main()
     }
 
     println!("cargo:rustc-link-bin=static=token");
+
+    // bindgen, C token API
+    let mut builder = bindgen::builder().clang_args(&BINGDEN_ARGS);
+
+    for header in HEADER_FILES {
+        builder = builder.header(header);
+    }
+
+    for include in INCLUDE_PATHS {
+        let arg = format!("-I{}", include);
+        builder = builder.clang_arg(arg);
+    }
+
+    let bindings = builder.generate().unwrap();
+    bindings.write_to_file("src/token_raw.rs").unwrap();
 }
