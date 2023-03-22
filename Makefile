@@ -2,9 +2,9 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
 up_dir      := $(dir $(current_dir))
 
-export PATH := ${up_dir}/fvp-cca-scripts/toolchains/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-linux-gnu/bin:${PATH}
 export KERNEL_DIR := ${up_dir}/fvp-cca-scripts/4.linux-cca-realm
 export SHARED_DIR := ${up_dir}/fvp-cca-scripts/out/shared_dir
+export PATH := ${up_dir}/fvp-cca-scripts/toolchains/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-linux-gnu/bin:${PATH}
 export CROSS_COMPILE := aarch64-none-linux-gnu-
 export ARCH := arm64
 
@@ -22,7 +22,6 @@ module: ${HEADERS}
 cmdline:
 	cd ${CMDLINE}; cargo build -r
 	install -m755 ${CMDLINE}/target/aarch64-unknown-linux-gnu/release/${CMDLINE} ${SHARED_DIR}
-	${CROSS_COMPILE}strip ${SHARED_DIR}/${CMDLINE}
 
 clean:
 	make -C ${KERNEL_DIR} M=$(PWD) clean

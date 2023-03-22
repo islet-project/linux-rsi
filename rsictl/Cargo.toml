@@ -11,3 +11,6 @@ description = "Command line interface for the RSI kernel module"
 clap = { version = "*", features = ["derive"] }
 nix = "*"
 rand = "*"
+
+[profile.release]
+strip = true
