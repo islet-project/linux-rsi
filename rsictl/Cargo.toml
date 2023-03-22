@@ -12,5 +12,8 @@ clap = { version = "*", features = ["derive"] }
 nix = "*"
 rand = "*"
 
+[build-dependencies]
+cc = "*"
+
 [profile.release]
 strip = true

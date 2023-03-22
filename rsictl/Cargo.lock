@@ -271,6 +271,7 @@ dependencies = [
 name = "rsictl"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "clap",
  "nix",
  "rand",
