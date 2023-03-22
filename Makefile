@@ -13,11 +13,17 @@ HEADERS=rsi.h
 
 obj-m += rsi.o
 
-all: module
+all: module cmdline
 
 module: ${HEADERS}
 	make -C ${KERNEL_DIR} M=$(PWD) modules
 	cp rsi.ko ${SHARED_DIR}
 
+cmdline:
+	cd ${CMDLINE}; cargo build -r
+	install -m755 ${CMDLINE}/target/aarch64-unknown-linux-gnu/release/${CMDLINE} ${SHARED_DIR}
+	${CROSS_COMPILE}strip ${SHARED_DIR}/${CMDLINE}
+
 clean:
 	make -C ${KERNEL_DIR} M=$(PWD) clean
+	cd ${CMDLINE}; cargo clean
