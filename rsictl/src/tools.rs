@@ -1,3 +1,4 @@
+use crate::token_c;
 use rand::{distributions::Standard, Rng};
 use std::{
     fs::File,
@@ -34,4 +35,11 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
 {
     let rng = rand::thread_rng();
     rng.sample_iter(&Standard).take(len).collect()
+}
+
+pub(crate) fn verify_print(token: &[u8]) -> Result<(), token_c::TokenError>
+{
+    let claims = token_c::verify_token(&token)?;
+    token_c::print_token(&claims);
+    Ok(())
 }

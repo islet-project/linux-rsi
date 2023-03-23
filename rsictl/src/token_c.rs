@@ -34,7 +34,6 @@ impl From<i32> for TokenError
     }
 }
 
-#[allow(dead_code)]
 fn new_claims() -> token_raw::attestation_claims
 {
     let claim_union = token_raw::claim_t__bindgen_ty_1 {
@@ -62,7 +61,6 @@ fn new_claims() -> token_raw::attestation_claims
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn verify_token(token: &[u8])
                            -> Result<token_raw::attestation_claims, TokenError>
 {
@@ -86,7 +84,6 @@ pub(crate) fn print_raw_token(token: &[u8])
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn print_token(claims: &token_raw::attestation_claims)
 {
     unsafe {

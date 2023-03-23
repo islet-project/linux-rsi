@@ -30,6 +30,8 @@ enum Commands
     MeasurExtend(subcmds::MeasurExtendArgs),
     /// Gets attestation token
     Attest(subcmds::AttestArgs),
+    /// Verifies and prints the token from a file
+    Verify(subcmds::VerifyArgs),
     /// Reads the current content of /dev/rsi
     DevRead(subcmds::DevReadArgs),
 }
@@ -43,6 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Commands::MeasurRead(args) => subcmds::measur_read(args)?,
         Commands::MeasurExtend(args) => subcmds::measur_extend(args)?,
         Commands::Attest(args) => subcmds::attest(args)?,
+        Commands::Verify(args) => subcmds::verify(args)?,
         Commands::DevRead(args) => subcmds::dev_read(args)?,
     };
 

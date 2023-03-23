@@ -79,7 +79,7 @@ pub(crate) struct AttestArgs
     #[arg(short, long)]
     input: Option<String>,
 
-    /// filename to write the token to, none for stdout hexdump
+    /// filename to write the token to, none to verify & print
     #[arg(short, long)]
     output: Option<String>,
 }
@@ -101,10 +101,25 @@ pub(crate) fn attest(args: &AttestArgs) -> GenericResult
     let token = rsictl::dev_read()?;
 
     match &args.output {
-        None => tools::hexdump(&token, 8, None),
+        None => tools::verify_print(&token)?,
         Some(f) => tools::file_write(f, &token)?,
     }
 
+    Ok(())
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct VerifyArgs
+{
+    /// filename with the token to verify
+    #[arg(short, long)]
+    input: String,
+}
+
+pub(crate) fn verify(args: &VerifyArgs) -> GenericResult
+{
+    let token = tools::file_read(&args.input)?;
+    tools::verify_print(&token)?;
     Ok(())
 }
 
