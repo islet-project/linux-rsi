@@ -1,4 +1,5 @@
 mod subcmds;
+mod token;
 mod token_c;
 #[allow(
     dead_code,

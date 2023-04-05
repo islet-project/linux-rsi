@@ -12,6 +12,7 @@ clap = { version = "*", features = ["derive"] }
 nix = "*"
 rand = "*"
 hex = "*"
+ciborium = "*"
 
 [build-dependencies]
 cc = "*"
