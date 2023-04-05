@@ -39,7 +39,10 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
 
 pub(crate) fn verify_print(token: &[u8]) -> Result<(), token_c::TokenError>
 {
-    let claims = token_c::verify_token(&token)?;
+    let claims = token_c::verify_token(token)?;
+    print!("\n\n\n !!!!!!!!!!!!!!! C PRINT !!!!!!!!!!!!!!! \n\n\n");
     token_c::print_token(&claims);
+    print!("\n\n\n !!!!!!!!!!!!!!! RUST PRINT !!!!!!!!!!!!!!! \n\n\n");
+    token_c::print_token_rust(&claims);
     Ok(())
 }

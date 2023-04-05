@@ -90,3 +90,118 @@ pub(crate) fn print_token(claims: &token_raw::attestation_claims)
         token_raw::print_token(claims as *const token_raw::attestation_claims);
     }
 }
+
+// Rust code that prints c struct
+
+use std::ffi::{CStr, c_char};
+use core::slice;
+
+const COLUMN: usize = 30;
+
+fn cstr_to_str<'a>(s: *const c_char) -> &'a str
+{
+    unsafe {
+        CStr::from_ptr(s)
+    }.to_str().unwrap()
+}
+
+fn print_indent(indent: i32)
+{
+    for _i in 0..indent {
+        print!("  ");
+    }
+}
+
+fn print_byte_string(name: *const c_char, index: i64,
+                     buf: token_raw::q_useful_buf_c)
+{
+    let v = unsafe {
+        slice::from_raw_parts(buf.ptr as *const u8, buf.len)
+    }.to_vec();
+    println!("{:COLUMN$} (#{}) = [{}]", cstr_to_str(name), index, hex::encode(v));
+}
+
+fn print_text(name: *const c_char, index: i64,
+              buf: token_raw::q_useful_buf_c)
+{
+    let v = unsafe {
+        slice::from_raw_parts(buf.ptr as *const u8, buf.len)
+    }.to_vec();
+    println!("{:COLUMN$} (#{}) = \"{}\"", cstr_to_str(name), index, String::from_utf8_lossy(&v));
+}
+
+fn print_claim(claim: &token_raw::claim_t, indent: i32)
+{
+    print_indent(indent);
+
+    if claim.present {
+        match claim.type_ {
+            token_raw::claim_data_type_CLAIM_INT64 =>
+                println!("{:COLUMN$} (#{}) = {}",
+                         cstr_to_str(claim.title), claim.key,
+                         unsafe { claim.__bindgen_anon_1.int_data }),
+            token_raw::claim_data_type_CLAIM_BOOL =>
+                println!("{:COLUMN$} (#{}) = {}",
+                         cstr_to_str(claim.title), claim.key,
+                         unsafe { claim.__bindgen_anon_1.bool_data }),
+            token_raw::claim_data_type_CLAIM_BSTR =>
+                print_byte_string(claim.title, claim.key,
+                                  unsafe { claim.__bindgen_anon_1.buffer_data }),
+            token_raw::claim_data_type_CLAIM_TEXT =>
+                print_text(claim.title, claim.key,
+                           unsafe { claim.__bindgen_anon_1.buffer_data }),
+            _ => println!("* Internal error, print_claim, Key: {}, Title: {}",
+                          claim.key, cstr_to_str(claim.title)),
+        }
+    } else {
+        let mandatory = if claim.mandatory { "mandatory " } else { "" };
+        println!("* Missing {}claim with key: {} ({})",
+                 mandatory, claim.key, cstr_to_str(claim.title));
+    }
+}
+
+fn print_cose_sign1_wrapper(token_type: &str,
+                            cose_sign1_wrapper: &[token_raw::claim_t])
+{
+    println!("== {} Token cose header:", token_type);
+    print_claim(&cose_sign1_wrapper[0], 0);
+	/* Don't print wrapped token bytestring */
+    print_claim(&cose_sign1_wrapper[2], 0);
+    println!("== End of {} Token cose header\n", token_type);
+}
+
+pub(crate) fn print_token_rust(claims: &token_raw::attestation_claims)
+{
+    print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
+
+    println!("== Realm Token:");
+    for token in &claims.realm_token_claims {
+        print_claim(token, 0);
+    }
+    println!("{:COLUMN$} (#{})", "Realm measurements", token_raw::CCA_REALM_EXTENSIBLE_MEASUREMENTS);
+    for claim in &claims.realm_measurement_claims {
+        print_claim(claim, 1);
+    }
+    println!("== End of Realm Token.\n\n");
+
+    print_cose_sign1_wrapper("Platform", &claims.plat_cose_sign1_wrapper);
+
+    println!("== Platform Token:");
+    for claim in &claims.plat_token_claims {
+        print_claim(claim, 0);
+    }
+    println!("== End of Platform Token\n");
+
+    let mut count = 0;
+    println!("== Platform Token SW components:");
+    for component in &claims.sw_component_claims {
+        if component.present {
+            println!("  SW component #{}:", count);
+            for claim in &component.claims {
+                print_claim(&claim, 2)
+            }
+            count += 1;
+        }
+    }
+	println!("== End of Platform Token SW components\n\n");
+}
