@@ -42,7 +42,6 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose header\n", token_type);
 }
 
-#[allow(dead_code)]
 pub(crate) fn print_token(claims: &AttestationClaims)
 {
     print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);

@@ -124,6 +124,21 @@ pub(crate) fn verify(args: &VerifyArgs) -> GenericResult
 }
 
 #[derive(Args, Debug)]
+pub(crate) struct VerifyCArgs
+{
+    /// filename with the token to verify
+    #[arg(short, long)]
+    input: String,
+}
+
+pub(crate) fn verify_c(args: &VerifyCArgs) -> GenericResult
+{
+    let token = tools::file_read(&args.input)?;
+    tools::verify_print_c(&token)?;
+    Ok(())
+}
+
+#[derive(Args, Debug)]
 pub(crate) struct DevReadArgs
 {
     /// filename to write the measurement, none for stdout hexdump

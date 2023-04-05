@@ -267,7 +267,6 @@ fn verify_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
     Err(TokenError::InvalidTokenFormat("verify cca token failed"))
 }
 
-#[allow(dead_code)]
 pub(crate) fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
 {
     let mut attest_claims = AttestationClaims::default();
