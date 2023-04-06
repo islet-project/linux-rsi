@@ -29,22 +29,35 @@ fn print_claim(claim: &Claim, indent: i32)
     }
 }
 
+fn print_cose_sign1(token_type: &str,
+                    cose_sign1: &CoseSign1)
+{
+    println!("== {} Token cose:", token_type);
+    println!("{:COLUMN$} = {:?}", "Protected header", cose_sign1.protected.header);
+    println!("{:COLUMN$} = {:?}", "Unprotected header", cose_sign1.unprotected);
+    //println!("{:COLUMN$} = [{}]", "Token payload", hex::encode(cose_sign1.payload.as_ref().unwrap_or(&Vec::new())));
+    println!("{:COLUMN$} = [{}]", "Signature", hex::encode(&cose_sign1.signature));
+    println!("== End of {} Token cose\n", token_type);
+}
+
+#[allow(dead_code)]
 fn print_cose_sign1_wrapper(token_type: &str,
                             cose_sign1_wrapper: &[Claim])
 {
-    println!("== {} Token cose header:", token_type);
+    println!("== {} Token cose wrapper:", token_type);
     print_claim(&cose_sign1_wrapper[0], 0);
 
 	/* Don't print wrapped token bytestring */
     print_claim(&cose_sign1_wrapper[1], 0);
 
     print_claim(&cose_sign1_wrapper[2], 0);
-    println!("== End of {} Token cose header\n", token_type);
+    println!("== End of {} Token cose wrapper\n", token_type);
 }
 
 pub(crate) fn print_token(claims: &AttestationClaims)
 {
-    print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
+    print_cose_sign1("Realm", &claims.realm_cose_sign1);
+    //print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
 
     println!("== Realm Token:");
     for token in &claims.realm_token_claims {
@@ -56,7 +69,8 @@ pub(crate) fn print_token(claims: &AttestationClaims)
     }
     println!("== End of Realm Token.\n\n");
 
-    print_cose_sign1_wrapper("Platform", &claims.plat_cose_sign1_wrapper);
+    print_cose_sign1("Platform", &claims.plat_cose_sign1);
+    //print_cose_sign1_wrapper("Platform", &claims.plat_cose_sign1_wrapper);
 
     println!("== Platform Token:");
     for claim in &claims.plat_token_claims {

@@ -3,6 +3,7 @@ pub(crate) mod verifier;
 
 
 use ciborium::de;
+use coset::CoseSign1;
 use std::fmt::Debug;
 use std::default::Default;
 
@@ -58,6 +59,43 @@ pub(crate) enum ClaimData
     Text(String),
 }
 
+#[allow(dead_code)]
+impl ClaimData
+{
+    fn get_bool(&self) -> bool
+    {
+        if let ClaimData::Bool(b) = self {
+            return *b;
+        } else {
+            panic!("ClaimData is not Bool");
+        }
+    }
+    fn get_int64(&self) -> i64
+    {
+        if let ClaimData::Int64(i) = self {
+            return *i;
+        } else {
+            panic!("ClaimData is not Int64");
+        }
+    }
+    fn get_bstr(&self) -> &[u8]
+    {
+        if let ClaimData::Bstr(d) = self {
+            return d;
+        } else {
+            panic!("ClaimData is not Bstr");
+        }
+    }
+    fn get_text(&self) -> &str
+    {
+        if let ClaimData::Text(s) = self {
+            return s;
+        } else {
+            panic!("ClaimData is not Text");
+        }
+    }
+}
+
 impl Default for ClaimData
 {
     fn default() -> Self
@@ -87,9 +125,11 @@ pub(crate) struct SwComponent
 pub(crate) struct AttestationClaims
 {
     pub realm_cose_sign1_wrapper: [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER],
+    pub realm_cose_sign1: CoseSign1,
     pub realm_token_claims: [Claim; CLAIM_COUNT_REALM_TOKEN],
     pub realm_measurement_claims: [Claim; CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS],
     pub plat_cose_sign1_wrapper: [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER],
+    pub plat_cose_sign1: CoseSign1,
     pub plat_token_claims: [Claim; CLAIM_COUNT_PLATFORM_TOKEN],
     pub sw_component_claims: [SwComponent; MAX_SW_COMPONENT_COUNT],
 }
@@ -104,6 +144,8 @@ pub(crate) enum TokenError
     InvalidTokenFormat(&'static str),
     InternalError,
     Ciborium(de::Error<std::io::Error>),
+    Coset(coset::CoseError),
+    Ecdsa(ecdsa::Error),
 }
 
 impl std::fmt::Display for TokenError
@@ -134,5 +176,19 @@ impl From<de::Error<std::io::Error>> for TokenError
 {
     fn from(value: de::Error<std::io::Error>) -> Self {
         Self::Ciborium(value)
+    }
+}
+
+impl From<coset::CoseError> for TokenError
+{
+    fn from(value: coset::CoseError) -> Self {
+        Self::Coset(value)
+    }
+}
+
+impl From<ecdsa::Error> for TokenError
+{
+    fn from(value: ecdsa::Error) -> Self {
+        Self::Ecdsa(value)
     }
 }

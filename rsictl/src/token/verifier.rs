@@ -1,4 +1,7 @@
+use std::str::FromStr;
 use ciborium::{de, value::Value};
+use coset::{AsCborValue, CoseSign1};
+use p384::ecdsa::signature::Verifier;
 use super::*;
 
 
@@ -201,12 +204,19 @@ fn verify_platform_token(attest_claims: &mut AttestationClaims) -> Result<(), To
     Err(TokenError::InvalidTokenFormat("verify platform token failed"))
 }
 
-fn verify_token_sign1_wrapping(buf: &[u8],
-                               cose_sign1_wrapper: &mut [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER])
-                               -> Result<(), TokenError>
+fn verify_token_sign1(buf: &[u8],
+                      cose_sign1: &mut CoseSign1,
+                      cose_sign1_wrapper: &mut [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER])
+                      -> Result<(), TokenError>
 {
     if let Value::Tag(tag, data) = de::from_reader(buf)? {
-        if let Value::Array(v) = *data {
+        let unboxed = *data;
+
+        // unpack with CoseSign1 for the purpose of coset verification
+        *cose_sign1 = CoseSign1::from_cbor_value(unboxed.clone())?;
+
+        // unpack manually using ciborium
+        if let Value::Array(v) = unboxed {
             if tag != TAG_COSE_SIGN1 {
                 return Err(TokenError::InvalidTag);
             }
@@ -274,11 +284,51 @@ pub(crate) fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
 
     let (platform_token, realm_token) = verify_cca_token(&buf)?;
 
-    verify_token_sign1_wrapping(&realm_token, &mut attest_claims.realm_cose_sign1_wrapper)?;
-    verify_token_sign1_wrapping(&platform_token, &mut attest_claims.plat_cose_sign1_wrapper)?;
+    verify_token_sign1(&realm_token,
+                       &mut attest_claims.realm_cose_sign1,
+                       &mut attest_claims.realm_cose_sign1_wrapper)?;
+    verify_token_sign1(&platform_token,
+                       &mut attest_claims.plat_cose_sign1,
+                       &mut attest_claims.plat_cose_sign1_wrapper)?;
 
     verify_realm_token(&mut attest_claims)?;
     verify_platform_token(&mut attest_claims)?;
 
+    let realm_key = attest_claims.realm_token_claims[4].data.get_bstr();
+    verify_coset_signature(&attest_claims.realm_cose_sign1, realm_key, b"")?;
+
+    //let platform_key = external_source();
+    //verify_coset_signature(&attest_claims.plat_cose_sign1, platform_key, b"")?;
+
     Ok(attest_claims)
+}
+
+// ES384 verifiers
+
+pub(crate) fn verify_coset_signature(cose: &CoseSign1, key: &[u8], aad: &[u8]) -> Result<(), TokenError>
+{
+    let verifier = RustCryptoVerifier::new(&key);
+    cose.verify_signature(aad, |sig, data| verifier.verify(sig, data))
+}
+
+struct RustCryptoVerifier
+{
+    key_public_raw: Vec<u8>,
+}
+
+impl RustCryptoVerifier
+{
+    fn new(key_public: &[u8]) -> Self
+    {
+        Self { key_public_raw: key_public.to_vec() }
+    }
+
+    fn verify(&self, sig: &[u8], data: &[u8]) -> Result<(), TokenError>
+    {
+        let key = p384::ecdsa::VerifyingKey::from_sec1_bytes(&self.key_public_raw)?;
+        let sig_hex = hex::encode(sig);
+        let sig = p384::ecdsa::Signature::from_str(&sig_hex)?;
+        key.verify(data, &sig)?;
+        Ok(())
+    }
 }

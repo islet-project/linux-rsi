@@ -13,6 +13,9 @@ nix = "*"
 rand = "*"
 hex = "*"
 ciborium = "*"
+coset = "*"
+p384 = "*"
+ecdsa = "*"
 
 [build-dependencies]
 cc = "*"
