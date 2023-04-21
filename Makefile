@@ -20,7 +20,7 @@ module: ${HEADERS}
 	cp rsi.ko ${SHARED_DIR}
 
 cmdline:
-	cd ${CMDLINE}; cargo build -r
+	cd ${CMDLINE}; cargo build -r --target aarch64-unknown-linux-gnu
 	install -m755 ${CMDLINE}/target/aarch64-unknown-linux-gnu/release/${CMDLINE} ${SHARED_DIR}
 
 clean:
