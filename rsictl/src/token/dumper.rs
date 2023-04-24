@@ -6,7 +6,7 @@ const COLUMN: usize = 30;
 
 fn print_indent(indent: i32)
 {
-    for _i in 0..indent {
+    for _ in 0..indent {
         print!("  ");
     }
 }
@@ -46,10 +46,7 @@ fn print_cose_sign1_wrapper(token_type: &str,
 {
     println!("== {} Token cose wrapper:", token_type);
     print_claim(&cose_sign1_wrapper[0], 0);
-
-	/* Don't print wrapped token bytestring */
-    print_claim(&cose_sign1_wrapper[1], 0);
-
+    //print_claim(&cose_sign1_wrapper[1], 0);  // token payload
     print_claim(&cose_sign1_wrapper[2], 0);
     println!("== End of {} Token cose wrapper\n", token_type);
 }
