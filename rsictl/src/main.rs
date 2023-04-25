@@ -1,13 +1,6 @@
 mod subcmds;
 mod token;
 mod token_c;
-#[allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals,
-)]
-mod token_raw;
 mod tools;
 
 use clap::{Parser, Subcommand};

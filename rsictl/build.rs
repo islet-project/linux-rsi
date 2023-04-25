@@ -61,5 +61,5 @@ fn main()
     }
 
     let bindings = builder.generate().unwrap();
-    bindings.write_to_file("src/token_raw.rs").unwrap();
+    bindings.write_to_file("src/token_c/bindgen.rs").unwrap();
 }

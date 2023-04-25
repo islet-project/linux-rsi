@@ -1,4 +1,10 @@
-use crate::token_raw;
+#[allow(
+    dead_code,
+    non_snake_case,
+    non_camel_case_types,
+    non_upper_case_globals,
+)]
+mod bindgen;
 
 #[derive(Debug)]
 pub(crate) enum TokenError
@@ -34,12 +40,12 @@ impl From<i32> for TokenError
     }
 }
 
-fn new_claims() -> token_raw::attestation_claims
+fn new_claims() -> bindgen::attestation_claims
 {
-    let claim_union = token_raw::claim_t__bindgen_ty_1 {
+    let claim_union = bindgen::claim_t__bindgen_ty_1 {
         bool_data: false,
     };
-    let claim = token_raw::claim_t {
+    let claim = bindgen::claim_t {
         mandatory: false,
         type_: 0,
         key: 0,
@@ -47,26 +53,26 @@ fn new_claims() -> token_raw::attestation_claims
         present: false,
         __bindgen_anon_1: claim_union,
     };
-    let component = token_raw::sw_component_t {
+    let component = bindgen::sw_component_t {
         present: false,
-        claims: [claim; token_raw::CLAIM_COUNT_SW_COMPONENT as usize],
+        claims: [claim; bindgen::CLAIM_COUNT_SW_COMPONENT as usize],
     };
-    token_raw::attestation_claims {
-        realm_cose_sign1_wrapper: [claim; token_raw::CLAIM_COUNT_COSE_SIGN1_WRAPPER as usize],
-        realm_token_claims: [claim; token_raw::CLAIM_COUNT_REALM_TOKEN as usize],
-        realm_measurement_claims: [claim; token_raw::CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS as usize],
-        plat_cose_sign1_wrapper: [claim; token_raw::CLAIM_COUNT_COSE_SIGN1_WRAPPER as usize],
-        plat_token_claims: [claim; token_raw::CLAIM_COUNT_PLATFORM_TOKEN as usize],
-        sw_component_claims: [component; token_raw::MAX_SW_COMPONENT_COUNT as usize]
+    bindgen::attestation_claims {
+        realm_cose_sign1_wrapper: [claim; bindgen::CLAIM_COUNT_COSE_SIGN1_WRAPPER as usize],
+        realm_token_claims: [claim; bindgen::CLAIM_COUNT_REALM_TOKEN as usize],
+        realm_measurement_claims: [claim; bindgen::CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS as usize],
+        plat_cose_sign1_wrapper: [claim; bindgen::CLAIM_COUNT_COSE_SIGN1_WRAPPER as usize],
+        plat_token_claims: [claim; bindgen::CLAIM_COUNT_PLATFORM_TOKEN as usize],
+        sw_component_claims: [component; bindgen::MAX_SW_COMPONENT_COUNT as usize]
     }
 }
 
 pub(crate) fn verify_token(token: &[u8])
-                           -> Result<token_raw::attestation_claims, TokenError>
+                           -> Result<bindgen::attestation_claims, TokenError>
 {
     let mut claims = new_claims();
     let ret = unsafe {
-        token_raw::verify_token(token.as_ptr() as *const std::os::raw::c_char,
+        bindgen::verify_token(token.as_ptr() as *const std::os::raw::c_char,
                                 token.len(), &mut claims)
     };
     match ret {
@@ -79,15 +85,15 @@ pub(crate) fn verify_token(token: &[u8])
 pub(crate) fn print_raw_token(token: &[u8])
 {
     unsafe {
-        token_raw::print_raw_token(token.as_ptr() as *const std::os::raw::c_char,
+        bindgen::print_raw_token(token.as_ptr() as *const std::os::raw::c_char,
                                    token.len());
     }
 }
 
-pub(crate) fn print_token(claims: &token_raw::attestation_claims)
+pub(crate) fn print_token(claims: &bindgen::attestation_claims)
 {
     unsafe {
-        token_raw::print_token(claims as *const token_raw::attestation_claims);
+        bindgen::print_token(claims as *const bindgen::attestation_claims);
     }
 }
 
@@ -113,7 +119,7 @@ fn print_indent(indent: i32)
 }
 
 fn print_byte_string(name: *const c_char, index: i64,
-                     buf: token_raw::q_useful_buf_c)
+                     buf: bindgen::q_useful_buf_c)
 {
     let v = unsafe {
         slice::from_raw_parts(buf.ptr as *const u8, buf.len)
@@ -122,7 +128,7 @@ fn print_byte_string(name: *const c_char, index: i64,
 }
 
 fn print_text(name: *const c_char, index: i64,
-              buf: token_raw::q_useful_buf_c)
+              buf: bindgen::q_useful_buf_c)
 {
     let v = unsafe {
         slice::from_raw_parts(buf.ptr as *const u8, buf.len)
@@ -130,24 +136,24 @@ fn print_text(name: *const c_char, index: i64,
     println!("{:COLUMN$} (#{}) = \"{}\"", cstr_to_str(name), index, String::from_utf8_lossy(&v));
 }
 
-fn print_claim(claim: &token_raw::claim_t, indent: i32)
+fn print_claim(claim: &bindgen::claim_t, indent: i32)
 {
     print_indent(indent);
 
     if claim.present {
         match claim.type_ {
-            token_raw::claim_data_type_CLAIM_INT64 =>
+            bindgen::claim_data_type_CLAIM_INT64 =>
                 println!("{:COLUMN$} (#{}) = {}",
                          cstr_to_str(claim.title), claim.key,
                          unsafe { claim.__bindgen_anon_1.int_data }),
-            token_raw::claim_data_type_CLAIM_BOOL =>
+            bindgen::claim_data_type_CLAIM_BOOL =>
                 println!("{:COLUMN$} (#{}) = {}",
                          cstr_to_str(claim.title), claim.key,
                          unsafe { claim.__bindgen_anon_1.bool_data }),
-            token_raw::claim_data_type_CLAIM_BSTR =>
+            bindgen::claim_data_type_CLAIM_BSTR =>
                 print_byte_string(claim.title, claim.key,
                                   unsafe { claim.__bindgen_anon_1.buffer_data }),
-            token_raw::claim_data_type_CLAIM_TEXT =>
+            bindgen::claim_data_type_CLAIM_TEXT =>
                 print_text(claim.title, claim.key,
                            unsafe { claim.__bindgen_anon_1.buffer_data }),
             _ => println!("* Internal error, print_claim, Key: {}, Title: {}",
@@ -161,7 +167,7 @@ fn print_claim(claim: &token_raw::claim_t, indent: i32)
 }
 
 fn print_cose_sign1_wrapper(token_type: &str,
-                            cose_sign1_wrapper: &[token_raw::claim_t])
+                            cose_sign1_wrapper: &[bindgen::claim_t])
 {
     println!("== {} Token cose header:", token_type);
     print_claim(&cose_sign1_wrapper[0], 0);
@@ -170,7 +176,7 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose header\n", token_type);
 }
 
-pub(crate) fn print_token_rust(claims: &token_raw::attestation_claims)
+pub(crate) fn print_token_rust(claims: &bindgen::attestation_claims)
 {
     print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
 
@@ -178,7 +184,7 @@ pub(crate) fn print_token_rust(claims: &token_raw::attestation_claims)
     for token in &claims.realm_token_claims {
         print_claim(token, 0);
     }
-    println!("{:COLUMN$} (#{})", "Realm measurements", token_raw::CCA_REALM_EXTENSIBLE_MEASUREMENTS);
+    println!("{:COLUMN$} (#{})", "Realm measurements", bindgen::CCA_REALM_EXTENSIBLE_MEASUREMENTS);
     for claim in &claims.realm_measurement_claims {
         print_claim(claim, 1);
     }
