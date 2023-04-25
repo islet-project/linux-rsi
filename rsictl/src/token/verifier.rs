@@ -237,7 +237,7 @@ fn verify_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
     Ok((platform, realm))
 }
 
-pub(crate) fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
+pub fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
 {
     let mut attest_claims = AttestationClaims::new();
 

@@ -51,7 +51,7 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose wrapper\n", token_type);
 }
 
-pub(crate) fn print_token(claims: &AttestationClaims)
+pub fn print_token(claims: &AttestationClaims)
 {
     print_cose_sign1("Realm", &claims.realm_cose_sign1);
     //print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);

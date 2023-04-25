@@ -1,4 +1,3 @@
-use crate::{token, token_c};
 use rand::{distributions::Standard, Rng};
 use std::{
     fs::File,
@@ -37,20 +36,19 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
     rng.sample_iter(&Standard).take(len).collect()
 }
 
-pub(crate) fn verify_print(token: &[u8]) -> Result<(), token::TokenError>
+pub(crate) fn verify_print(token: &[u8]) -> Result<(), rsictl::TokenError>
 {
-    let claims = token::verifier::verify_token(token)?;
-    token::dumper::print_token(&claims);
-
+    let claims = rsictl::verify_token(token)?;
+    rsictl::print_token(&claims);
     Ok(())
 }
 
-pub(crate) fn verify_print_c(token: &[u8]) -> Result<(), token_c::TokenError>
+pub(crate) fn verify_print_c(token: &[u8]) -> Result<(), rsictl::CTokenError>
 {
-    let claims = token_c::verify_token(token)?;
+    let claims = rsictl::c_verify_token(token)?;
     print!("\n\n\n !!!!!!!!!!!!!!! C PRINT !!!!!!!!!!!!!!! \n\n\n");
-    token_c::print_token(&claims);
+    rsictl::c_print_token(&claims);
     print!("\n\n\n !!!!!!!!!!!!!!! RUST PRINT !!!!!!!!!!!!!!! \n\n\n");
-    token_c::print_token_rust(&claims);
+    rsictl::c_print_token_rust(&claims);
     Ok(())
 }

@@ -4,10 +4,10 @@
     non_camel_case_types,
     non_upper_case_globals,
 )]
-mod bindgen;
+pub(crate) mod bindgen;
 
 #[derive(Debug)]
-pub(crate) enum TokenError
+pub enum TokenError
 {
     InitError,
     MissingMandatoryClaim,
@@ -67,8 +67,8 @@ fn new_claims() -> bindgen::attestation_claims
     }
 }
 
-pub(crate) fn verify_token(token: &[u8])
-                           -> Result<bindgen::attestation_claims, TokenError>
+pub fn verify_token(token: &[u8])
+                    -> Result<bindgen::attestation_claims, TokenError>
 {
     let mut claims = new_claims();
     let ret = unsafe {
@@ -82,7 +82,7 @@ pub(crate) fn verify_token(token: &[u8])
 }
 
 #[allow(dead_code)]
-pub(crate) fn print_raw_token(token: &[u8])
+pub fn print_raw_token(token: &[u8])
 {
     unsafe {
         bindgen::print_raw_token(token.as_ptr() as *const std::os::raw::c_char,
@@ -90,7 +90,7 @@ pub(crate) fn print_raw_token(token: &[u8])
     }
 }
 
-pub(crate) fn print_token(claims: &bindgen::attestation_claims)
+pub fn print_token(claims: &bindgen::attestation_claims)
 {
     unsafe {
         bindgen::print_token(claims as *const bindgen::attestation_claims);
@@ -176,7 +176,8 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose header\n", token_type);
 }
 
-pub(crate) fn print_token_rust(claims: &bindgen::attestation_claims)
+#[allow(dead_code)]
+pub fn print_token_rust(claims: &bindgen::attestation_claims)
 {
     print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
 

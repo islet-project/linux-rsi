@@ -51,7 +51,7 @@ const MAX_SW_COMPONENT_COUNT: usize =                   32;
 
 
 #[derive(Debug)]
-pub(crate) enum ClaimData
+pub enum ClaimData
 {
     Bool(bool),
     Int64(i64),
@@ -114,7 +114,7 @@ impl Default for ClaimData
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Claim
+pub struct Claim
 {
     pub mandatory: bool,
     pub key: i64,
@@ -138,14 +138,14 @@ impl Claim
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct SwComponent
+pub struct SwComponent
 {
     pub present: bool,
     pub claims: [Claim; CLAIM_COUNT_SW_COMPONENT],
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct AttestationClaims
+pub struct AttestationClaims
 {
     pub realm_cose_sign1_wrapper: [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER],
     pub realm_cose_sign1: CoseSign1,
@@ -210,7 +210,7 @@ impl AttestationClaims
 }
 
 #[derive(Debug)]
-pub(crate) enum TokenError
+pub enum TokenError
 {
     InvalidKey(&'static str),
     InvalidTag(&'static str),
