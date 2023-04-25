@@ -26,8 +26,6 @@ enum Commands
     Verify(subcmds::VerifyArgs),
     /// Verifies and prints the token from a file using kvm-test C code
     VerifyC(subcmds::VerifyCArgs),
-    /// Reads the current content of /dev/rsi
-    DevRead(subcmds::DevReadArgs),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
@@ -41,7 +39,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Commands::Attest(args) => subcmds::attest(args)?,
         Commands::Verify(args) => subcmds::verify(args)?,
         Commands::VerifyC(args) => subcmds::verify_c(args)?,
-        Commands::DevRead(args) => subcmds::dev_read(args)?,
     };
 
     Ok(())

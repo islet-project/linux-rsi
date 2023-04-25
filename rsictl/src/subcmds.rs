@@ -25,8 +25,7 @@ pub(crate) struct MeasurReadArgs
 
 pub(crate) fn measur_read(args: &MeasurReadArgs) -> GenericResult
 {
-    rsictl::measurement_read(args.index)?;
-    let data = rsictl::dev_read()?;
+    let data = rsictl::measurement_read(args.index)?;
 
     match &args.output {
         Some(f) => tools::file_write(f, &data)?,
@@ -66,8 +65,7 @@ pub(crate) fn measur_extend(args: &MeasurExtendArgs) -> GenericResult
         return Err(Box::new(nix::Error::E2BIG));
     }
 
-    rsictl::dev_write(&data)?;
-    rsictl::measurement_extend(args.index, data.len().try_into()?)?;
+    rsictl::measurement_extend(args.index, &data)?;
 
     Ok(())
 }
@@ -86,19 +84,17 @@ pub(crate) struct AttestArgs
 
 pub(crate) fn attest(args: &AttestArgs) -> GenericResult
 {
-    let challange = match &args.input {
+    let challenge = match &args.input {
         None => tools::random_data(64),
         Some(f) => tools::file_read(f)?,
     };
 
-    if challange.len() != 64 {
+    if challenge.len() != 64 {
         println!("Challange needs to be exactly 64 bytes");
         return Err(Box::new(nix::Error::E2BIG));
     }
 
-    rsictl::dev_write(&challange)?;
-    rsictl::attestation_token()?;
-    let token = rsictl::dev_read()?;
+    let token = rsictl::attestation_token(&challenge)?;
 
     match &args.output {
         None => tools::verify_print(&token)?,
@@ -135,25 +131,5 @@ pub(crate) fn verify_c(args: &VerifyCArgs) -> GenericResult
 {
     let token = tools::file_read(&args.input)?;
     tools::verify_print_c(&token)?;
-    Ok(())
-}
-
-#[derive(Args, Debug)]
-pub(crate) struct DevReadArgs
-{
-    /// filename to write the measurement, none for stdout hexdump
-    #[arg(short, long)]
-    output: Option<String>,
-}
-
-pub(crate) fn dev_read(args: &DevReadArgs) -> GenericResult
-{
-    let data = rsictl::dev_read()?;
-
-    match &args.output {
-        Some(f) => tools::file_write(f, &data)?,
-        None => tools::hexdump(&data, 8, None),
-    }
-
     Ok(())
 }

@@ -23,22 +23,26 @@ pub const fn abi_version_get_minor(version: u32) -> u32
     version & 0xFFFF
 }
 
-pub fn abi_version(fd: i32, data: *mut u32) -> nix::Result<i32>
+pub fn abi_version(fd: i32, data: *mut u32) -> nix::Result<()>
 {
-    unsafe { internal::abi_version(fd, data) }
+    unsafe { internal::abi_version(fd, data)? };
+    Ok(())
 }
 
-pub fn measurement_read(fd: i32, data: &[u32]) -> nix::Result<i32>
+pub fn measurement_read(fd: i32, data: &[u32]) -> nix::Result<()>
 {
-    unsafe { internal::measurement_read(fd, data) }
+    unsafe { internal::measurement_read(fd, data)? };
+    Ok(())
 }
 
-pub fn measurement_extend(fd: i32, data: &[u32]) -> nix::Result<i32>
+pub fn measurement_extend(fd: i32, data: &[u32]) -> nix::Result<()>
 {
-    unsafe { internal::measurement_extend(fd, data) }
+    unsafe { internal::measurement_extend(fd, data)? };
+    Ok(())
 }
 
-pub fn attestation_token(fd: i32) -> nix::Result<i32>
+pub fn attestation_token(fd: i32) -> nix::Result<()>
 {
-    unsafe { internal::attestation_token(fd) }
+    unsafe { internal::attestation_token(fd)? };
+    Ok(())
 }

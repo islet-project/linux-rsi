@@ -40,12 +40,7 @@ impl Drop for Fd
     }
 }
 
-/*
- * Public API below
- * TODO: add rust-doc
- */
-
-pub fn dev_read() -> std::io::Result<Vec<u8>>
+fn dev_read() -> std::io::Result<Vec<u8>>
 {
     let mut buf = Vec::<u8>::with_capacity(64);
     File::open(DEV)?.read_to_end(&mut buf)?;
@@ -53,7 +48,7 @@ pub fn dev_read() -> std::io::Result<Vec<u8>>
     Ok(buf)
 }
 
-pub fn dev_write(data: &[u8]) -> std::io::Result<()>
+fn dev_write(data: &[u8]) -> std::io::Result<()>
 {
     File::create(DEV)?.write_all(data)
 }
@@ -69,20 +64,27 @@ pub fn abi_version() -> nix::Result<(u32, u32)>
     ))
 }
 
-pub fn measurement_read(index: u32) -> nix::Result<i32>
+pub fn measurement_read(index: u32) -> nix::Result<Vec<u8>>
 {
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    kernel::measurement_read(fd.get(), &[index])
+    kernel::measurement_read(fd.get(), &[index])?;
+    std::mem::drop(fd);
+    Ok(dev_read().unwrap())
 }
 
-pub fn measurement_extend(index: u32, len: u32) -> nix::Result<i32>
+pub fn measurement_extend(index: u32, data: &[u8]) -> nix::Result<()>
 {
+    dev_write(data).unwrap();
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    kernel::measurement_extend(fd.get(), &[index, len])
+    let data_len = data.len().try_into().or(Err(nix::Error::E2BIG))?;
+    kernel::measurement_extend(fd.get(), &[index, data_len])
 }
 
-pub fn attestation_token() -> nix::Result<i32>
+pub fn attestation_token(challenge: &[u8]) -> nix::Result<Vec<u8>>
 {
+    dev_write(challenge).unwrap();
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    kernel::attestation_token(fd.get())
+    kernel::attestation_token(fd.get())?;
+    std::mem::drop(fd);
+    Ok(dev_read().unwrap())
 }
