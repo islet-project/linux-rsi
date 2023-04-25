@@ -1,18 +1,17 @@
-mod api;
 mod ioctl;
 mod token;
 // the below can be removed at some point, debug purposes only
 mod token_c;
 
 // dev handlers
-pub use api::dev_read;
-pub use api::dev_write;
+pub use ioctl::dev_read;
+pub use ioctl::dev_write;
 
 // ioctls
-pub use api::abi_version;
-pub use api::attestation_token;
-pub use api::measurement_extend;
-pub use api::measurement_read;
+pub use ioctl::abi_version;
+pub use ioctl::attestation_token;
+pub use ioctl::measurement_extend;
+pub use ioctl::measurement_read;
 
 // token
 pub use token::TokenError;

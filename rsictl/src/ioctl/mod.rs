@@ -1,4 +1,5 @@
-use crate::ioctl;
+mod kernel;
+
 use nix::{fcntl::OFlag, libc::O_RDWR, sys::stat::Mode};
 use std::{
     fs::File,
@@ -8,6 +9,7 @@ use std::{
 const FLAGS: OFlag = OFlag::from_bits_truncate(O_RDWR);
 const MODE: Mode = Mode::from_bits_truncate(0o644);
 const DEV: &str = "/dev/rsi";
+
 
 struct Fd
 {
@@ -60,27 +62,27 @@ pub fn abi_version() -> nix::Result<(u32, u32)>
 {
     let fd = Fd::wrap(nix::fcntl::open("/dev/rsi", FLAGS, MODE)?);
     let mut version = 0;
-    ioctl::abi_version(fd.get(), &mut version)?;
+    kernel::abi_version(fd.get(), &mut version)?;
     Ok((
-        ioctl::abi_version_get_major(version),
-        ioctl::abi_version_get_minor(version),
+        kernel::abi_version_get_major(version),
+        kernel::abi_version_get_minor(version),
     ))
 }
 
 pub fn measurement_read(index: u32) -> nix::Result<i32>
 {
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    ioctl::measurement_read(fd.get(), &[index])
+    kernel::measurement_read(fd.get(), &[index])
 }
 
 pub fn measurement_extend(index: u32, len: u32) -> nix::Result<i32>
 {
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    ioctl::measurement_extend(fd.get(), &[index, len])
+    kernel::measurement_extend(fd.get(), &[index, len])
 }
 
 pub fn attestation_token() -> nix::Result<i32>
 {
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    ioctl::attestation_token(fd.get())
+    kernel::attestation_token(fd.get())
 }
