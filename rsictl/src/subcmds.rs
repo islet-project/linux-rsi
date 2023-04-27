@@ -1,6 +1,7 @@
 use crate::tools;
 use clap::Args;
 
+
 pub(crate) type GenericResult = Result<(), Box<dyn std::error::Error>>;
 
 pub(crate) fn version() -> GenericResult
@@ -44,8 +45,8 @@ pub(crate) struct MeasurExtendArgs
     index: u32,
 
     /// length of random data to use (1-64)
-    #[arg(short, long, default_value_t = 64,
-          value_parser = clap::value_parser!(u32).range(1..=64))]
+    #[arg(short, long, default_value_t = rsictl::MAX_MEASUR_LEN.into(),
+          value_parser = clap::value_parser!(u32).range(1..=rsictl::MAX_MEASUR_LEN.into()))]
     random: u32,
 
     /// filename to extend the measurement with (1-64 bytes), none to use random
@@ -60,8 +61,8 @@ pub(crate) fn measur_extend(args: &MeasurExtendArgs) -> GenericResult
         Some(f) => tools::file_read(f)?,
     };
 
-    if data.is_empty() || data.len() > 64 {
-        println!("Data must be within 1-64 bytes");
+    if data.is_empty() || data.len() > rsictl::MAX_MEASUR_LEN as usize {
+        println!("Data must be within 1-64 bytes range");
         return Err(Box::new(nix::Error::E2BIG));
     }
 
@@ -85,16 +86,17 @@ pub(crate) struct AttestArgs
 pub(crate) fn attest(args: &AttestArgs) -> GenericResult
 {
     let challenge = match &args.input {
-        None => tools::random_data(64),
+        None => tools::random_data(rsictl::CHALLENGE_LEN as usize),
         Some(f) => tools::file_read(f)?,
     };
 
-    if challenge.len() != 64 {
+    if challenge.len() != rsictl::CHALLENGE_LEN as usize {
         println!("Challange needs to be exactly 64 bytes");
         return Err(Box::new(nix::Error::E2BIG));
     }
 
-    let token = rsictl::attestation_token(&challenge)?;
+    // try_into: &Vec<u8> -> &[u8,64]
+    let token = rsictl::attestation_token(&challenge.try_into().unwrap())?;
 
     match &args.output {
         None => tools::verify_print(&token)?,

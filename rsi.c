@@ -1,6 +1,8 @@
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
 #include <linux/init.h>      // included for __init and __exit macros
+#include <linux/mutex.h>
+#include <linux/slab.h>
 
 #include <linux/fs.h>
 #include <linux/cdev.h>
@@ -23,16 +25,15 @@ MODULE_DESCRIPTION("Linux RSI playground");
 #define RSI_ALERT KERN_ALERT RSI_TAG
 
 #define DEVICE_NAME       "rsi"       /* Name of device in /proc/devices */
-#define DEVICE_WRITE_LEN  64
 
 static int device_major;              /* Major number assigned to our device driver */
 static int device_open_count = 0;     /* Used to prevent multiple open */
-
-// this will hold attestation token, needs to be page size
-static char device_buf[RSI_GRANULE_SIZE];
-static size_t device_len;
-
 static struct class *cls;
+
+/* RSI attestation call consists of several arm_smc calls,
+ * don't let several users interrupt eachother.
+ */
+static DEFINE_MUTEX(attestation_call);
 
 
 static void rsi_playground(void)
@@ -40,7 +41,6 @@ static void rsi_playground(void)
 	unsigned long ret = 0;
 	bool realm = false;
 	unsigned long ver = 0;
-	const char *msg = "Welcome to RSI playground!\n";
 
 	// creative use of an API
 	realm = cc_platform_has(CC_ATTR_MEM_ENCRYPT);
@@ -54,51 +54,11 @@ static void rsi_playground(void)
 	// get config
 	ret = rsi_get_realm_config(&config);
 	printk(RSI_INFO "Config ret: %lu, Bits: %lX\n", ret, config.ipa_bits);
-
-	// copy initial test output content
-	device_len = strlen(msg);
-	strncpy(device_buf, msg, device_len);
 }
 
 #if 0
-static int nullify_input(char *input, size_t len, size_t max_len)
-{
-	if (len > max_len)
-		return -EINVAL;
-
-	if (len == max_len && input[len - 1] != '\n')
-		return -EINVAL;
-
-	if (input[len - 1] == '\n')
-		input[len - 1] = '\0';
-	else
-		input[len] = '\0';
-
-	return 0;
-}
-
-static int set_page_state(void *buf, enum ripas ripas)
-{
-	phys_addr_t start;
-	struct arm_smccc_1_2_regs input = {0}, output = {0};
-
-	start = virt_to_phys(buf);
-	start = ALIGN_DOWN(start, RSI_GRANULE_SIZE);
-
-	input.a0 = SMC_RSI_IPA_STATE_SET;
-	input.a1 = start;
-	input.a2 = RSI_GRANULE_SIZE;
-	input.a3 = ripas;
-	arm_smccc_1_2_smc(&input, &output);
-
-	if (output.a0 != RSI_SUCCESS)
-		return -rsi_ret_to_errno(output.a0);
-
-	return 0;
-}
-
 #define BYTE_STRING_LEN 4
-static void print_data(char *data, size_t len)
+static void print_data(uint8_t *data, size_t len)
 {
 	size_t i;
 	char ch[BYTE_STRING_LEN], line[32] = {0};
@@ -162,100 +122,36 @@ static int device_release(struct inode *i, struct file *f)
 	return 0;
 }
 
-// data that can be read is an output from RSI commands (e.g. tokens)
-// should be done after ioctl
-// respects offset, can be read in parts
-static ssize_t device_read(struct file *f, char *buffer, size_t len, loff_t *offset)
-{
-	int ret;
-	size_t left_to_read = device_len - *offset;
-	size_t will_read = min(left_to_read, len);
-
-	// TODO: safety check, this should probably be done in a different way
-	// can seek extend beyond file size? how is file size checked? what it if changes?
-	if (*offset > device_len) {
-		printk(RSI_ALERT "*offset > device_len, this should not happen\n");
-		return -EINVAL;
-	}
-
-	printk(RSI_INFO "device_read: %lu, will_read: %lu, offset: %lld\n",
-	       len, will_read, *offset);
-
-	if (left_to_read == 0)
-		return 0;
-
-	ret = copy_to_user(buffer, device_buf + *offset, will_read);
-	if (ret != 0) {
-		printk(RSI_ALERT "Failed to copy_to_user %d bytes\n", ret);
-		return ret;
-	}
-
-	*offset += will_read;
-
-	return will_read;
-}
-
-// data written is an input for RSI commands (e.g. challenges)
-// should be done before ioctl
-// single write per data, ignores offset
-static ssize_t device_write(struct file *f, const char *buffer, size_t len, loff_t *offset)
-{
-	int ret;
-
-	printk(RSI_INFO "device_write: %lu\n", len);
-
-	if (len == 0 || len > DEVICE_WRITE_LEN)
-		return -EINVAL;
-
-	ret = copy_from_user(device_buf, buffer, len);
-	if (ret != 0) {
-		printk(RSI_ALERT "Failed to copy_from_user %d bytes\n", ret);
-		return ret;
-	}
-	device_len = len;
-
-	//print_data(device_buf, device_len);
-
-	return len;
-}
-
-static int do_measurement_read(uint32_t index)
+static int do_measurement_read(struct rsi_measurement *measur)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
 
 	input.a0 = SMC_RSI_MEASUREMENT_READ;
-	input.a1 = index;
+	input.a1 = measur->index;
 	arm_smccc_1_2_smc(&input, &output);
 
 	if (output.a0 != RSI_SUCCESS)
 		return -rsi_ret_to_errno(output.a0);
 
-	device_len = sizeof(output.a1) * 8;
-	memcpy(device_buf, (char*)&output.a1, device_len);
-
-	//print_data(device_buf, device_len);
+	measur->data_len = sizeof(output.a1) * 8;
+	memcpy(measur->data, (uint8_t*)&output.a1, measur->data_len);
 
 	return 0;
 }
 
-static int do_measurement_extend(uint32_t index, uint32_t len)
+static int do_measurement_extend(struct rsi_measurement *measur)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
 
-	if (len > 64) {
-		printk(RSI_ALERT "ioctl: can't use more than 64 bytes\n");
-		return -EINVAL;
-	}
-
-	if (device_len < len) {
-		printk(RSI_ALERT "ioctl: too little data in the buffer\n");
+	if (measur->data_len == 0 || measur->data_len > 64) {
+		printk(RSI_ALERT "measurement_extend: must be in 1-64 bytes range\n");
 		return -EINVAL;
 	}
 
 	input.a0 = SMC_RSI_MEASUREMENT_EXTEND;
-	input.a1 = index;
-	input.a2 = len;
-	memcpy((char*)&output.a3, device_buf, len);
+	input.a1 = measur->index;
+	input.a2 = measur->data_len;
+	memcpy((uint8_t*)&output.a3, measur->data, measur->data_len);
 
 	arm_smccc_1_2_smc(&input, &output);
 
@@ -265,18 +161,13 @@ static int do_measurement_extend(uint32_t index, uint32_t len)
 	return 0;
 }
 
-static int do_attestation_init(phys_addr_t page)
+static int do_attestation_init(phys_addr_t page, struct rsi_attestation *attest)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
 
-	if (device_len != 64) {
-		printk(RSI_ALERT "ioctl: we need exactly 64 bytes in the buffer\n");
-		return -EINVAL;
-	}
-
 	input.a0 = SMC_RSI_ATTESTATION_TOKEN_INIT;
 	input.a1 = page;
-	memcpy((char*)&output.a2, device_buf, device_len);
+	memcpy((uint8_t*)&output.a2, attest->challenge, sizeof(attest->challenge));
 
 	arm_smccc_1_2_smc(&input, &output);
 
@@ -287,14 +178,9 @@ static int do_attestation_init(phys_addr_t page)
 		return -rsi_ret_to_errno(output.a0);
 }
 
-static int do_attestation_continue(phys_addr_t page, size_t *token_len)
+static int do_attestation_continue(phys_addr_t page, struct rsi_attestation *attest)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
-
-	if (device_len != 64) {
-		printk(RSI_ALERT "ioctl: we need exactly 64 bytes in the buffer\n");
-		return -EINVAL;
-	}
 
 	input.a0 = SMC_RSI_ATTESTATION_TOKEN_CONTINUE;
 	input.a1 = page;
@@ -302,7 +188,7 @@ static int do_attestation_continue(phys_addr_t page, size_t *token_len)
 	arm_smccc_1_2_smc(&input, &output);
 
 	if (output.a0 == RSI_SUCCESS) {
-		*token_len = output.a1;
+		attest->token_len = output.a1;
 		return 0;  // we're done
 	}
 
@@ -312,37 +198,37 @@ static int do_attestation_continue(phys_addr_t page, size_t *token_len)
 	return -rsi_ret_to_errno(output.a0);
 }
 
-static int do_attestation(void)
+static int do_attestation(struct rsi_attestation *attest)
 {
 	int ret;
-	size_t token_len;
 	phys_addr_t page = virt_to_phys(rsi_page_buf);
 
-	ret = do_attestation_init(page);
+	mutex_lock(&attestation_call);
 
+	ret = do_attestation_init(page, attest);
 	if (ret != 0)
-		return ret;
+		goto unlock;
 
 	do {
-		ret = do_attestation_continue(page, &token_len);
+		ret = do_attestation_continue(page, attest);
 	} while (ret == 1);
 
-	if (ret == 0) {
-		device_len = token_len;
-		memcpy(device_buf, rsi_page_buf, token_len);
+unlock:
+	mutex_unlock(&attestation_call);
 
-		//print_data(device_buf, min((size_t)64, device_len));
-	}
+	if (ret == 0)
+		memcpy(attest->token, rsi_page_buf, attest->token_len);
 
 	return ret;
 }
 
 static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	int ret;
-	uint32_t index;
-	uint32_t version;
-	uint32_t extend[2];
+	int ret = 0;
+
+	uint32_t version = 0;
+	struct rsi_measurement *measur = NULL;
+	struct rsi_attestation *attest = NULL;
 
 	switch (cmd) {
 	case RSIIO_ABI_VERSION:
@@ -357,44 +243,80 @@ static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
 		break;
 	case RSIIO_MEASUREMENT_READ:
-		ret = copy_from_user(&index, (uint32_t*)arg, sizeof(index));
-		if (ret != 0) {
-			printk(RSI_ALERT "ioctl: copy_from_user failed: %d\n", ret);
-			return ret;
+		measur = kmalloc(sizeof(struct rsi_measurement), GFP_KERNEL);
+		if (measur == NULL) {
+			printk("ioctl: failed to allocate");
+			return -ENOMEM;
 		}
 
-		printk(RSI_INFO "ioctl: measurement_read: %u\n", index);
+		ret = copy_from_user(measur, (struct rsi_measurement*)arg, sizeof(struct rsi_measurement));
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: copy_from_user failed: %d\n", ret);
+			goto end;
+		}
 
-		ret = do_measurement_read(index);
+		printk(RSI_INFO "ioctl: measurement_read: %u\n", measur->index);
+
+		ret = do_measurement_read(measur);
 		if (ret != 0) {
 			printk(RSI_ALERT "ioctl: measurement_read failed: %d\n", ret);
-			return ret;
+			goto end;
+		}
+
+		ret = copy_to_user((struct rsi_measurement*)arg, measur, sizeof(struct rsi_measurement));
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: copy_to_user failed: %d\n", ret);
+			goto end;
 		}
 
 		break;
 	case RSIIO_MEASUREMENT_EXTEND:
-		ret = copy_from_user(extend, (uint32_t*)arg, sizeof(extend));
-		if (ret != 0) {
-			printk(RSI_ALERT "ioctl: copy_from_user failed: %d\n", ret);
-			return ret;
+		measur = kmalloc(sizeof(struct rsi_measurement), GFP_KERNEL);
+		if (measur == NULL) {
+			printk("ioctl: failed to allocate");
+			return -ENOMEM;
 		}
 
-		printk(RSI_INFO "ioctl: measurement_extend: %u, %u\n", extend[0], extend[1]);
+		ret = copy_from_user(measur, (struct rsi_measurement*)arg, sizeof(struct rsi_measurement));
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: copy_from_user failed: %d\n", ret);
+			goto end;
+		}
 
-		ret = do_measurement_extend(extend[0], extend[1]);
+		printk(RSI_INFO "ioctl: measurement_extend: %u, %u\n", measur->index, measur->data_len);
+
+		ret = do_measurement_extend(measur);
 		if (ret != 0) {
 			printk(RSI_ALERT "ioctl: measurement_extend failed: %d\n", ret);
-			return ret;
+			goto end;
 		}
 
 		break;
 	case RSIIO_ATTESTATION_TOKEN:
+		attest = kmalloc(sizeof(struct rsi_attestation), GFP_KERNEL);
+		if (attest == NULL) {
+			printk("ioctl: failed to allocate");
+			return -ENOMEM;
+		}
+
+		ret = copy_from_user(attest, (struct rsi_attestation*)arg, sizeof(struct rsi_attestation));
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: copy_from_user failed: %d\n", ret);
+			goto end;
+		}
+
 		printk(RSI_INFO "ioctl: attestation_token");
 
-		ret = do_attestation();
+		ret = do_attestation(attest);
 		if (ret != 0) {
 			printk(RSI_ALERT "ioctl: attestation failed: %d\n", ret);
-			return ret;
+			goto end;
+		}
+
+		ret = copy_to_user((struct rsi_attestation*)arg, attest, sizeof(struct rsi_attestation));
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: copy_to_user failed: %d\n", ret);
+			goto end;
 		}
 
 		break;
@@ -403,14 +325,18 @@ static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		return -EINVAL;
 	}
 
-	return 0;
+	ret = 0;
+
+end:
+	kfree(attest);
+	kfree(measur);
+
+	return ret;
 }
 
 static struct file_operations chardev_fops = {
 	.open = device_open,
 	.release = device_release,
-	.read = device_read,
-	.write = device_write,
 	.unlocked_ioctl = device_ioctl,
 };
 

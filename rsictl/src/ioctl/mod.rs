@@ -1,10 +1,6 @@
-mod kernel;
+pub(super) mod kernel;
 
 use nix::{fcntl::OFlag, libc::O_RDWR, sys::stat::Mode};
-use std::{
-    fs::File,
-    io::{Read, Write},
-};
 
 const FLAGS: OFlag = OFlag::from_bits_truncate(O_RDWR);
 const MODE: Mode = Mode::from_bits_truncate(0o644);
@@ -40,19 +36,6 @@ impl Drop for Fd
     }
 }
 
-fn dev_read() -> std::io::Result<Vec<u8>>
-{
-    let mut buf = Vec::<u8>::with_capacity(64);
-    File::open(DEV)?.read_to_end(&mut buf)?;
-    buf.shrink_to_fit();
-    Ok(buf)
-}
-
-fn dev_write(data: &[u8]) -> std::io::Result<()>
-{
-    File::create(DEV)?.write_all(data)
-}
-
 pub fn abi_version() -> nix::Result<(u32, u32)>
 {
     let fd = Fd::wrap(nix::fcntl::open("/dev/rsi", FLAGS, MODE)?);
@@ -66,25 +49,23 @@ pub fn abi_version() -> nix::Result<(u32, u32)>
 
 pub fn measurement_read(index: u32) -> nix::Result<Vec<u8>>
 {
+    let mut measure = [kernel::RsiMeasurement::new_empty(index)];
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    kernel::measurement_read(fd.get(), &[index])?;
-    std::mem::drop(fd);
-    Ok(dev_read().unwrap())
+    kernel::measurement_read(fd.get(), &mut measure)?;
+    Ok(measure[0].data[..(measure[0].data_len as usize)].to_vec())
 }
 
 pub fn measurement_extend(index: u32, data: &[u8]) -> nix::Result<()>
 {
-    dev_write(data).unwrap();
+    let measur = [kernel::RsiMeasurement::new_from_data(index, data)];
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    let data_len = data.len().try_into().or(Err(nix::Error::E2BIG))?;
-    kernel::measurement_extend(fd.get(), &[index, data_len])
+    kernel::measurement_extend(fd.get(), &measur)
 }
 
-pub fn attestation_token(challenge: &[u8]) -> nix::Result<Vec<u8>>
+pub fn attestation_token(challenge: &[u8; 64]) -> nix::Result<Vec<u8>>
 {
-    dev_write(challenge).unwrap();
+    let mut attest = [kernel::RsiAttestation::new(challenge)];
     let fd = Fd::wrap(nix::fcntl::open(DEV, FLAGS, MODE)?);
-    kernel::attestation_token(fd.get())?;
-    std::mem::drop(fd);
-    Ok(dev_read().unwrap())
+    kernel::attestation_token(fd.get(), &mut attest)?;
+    Ok(attest[0].token[..(attest[0].token_len as usize)].to_vec())
 }
