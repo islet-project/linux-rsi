@@ -122,6 +122,25 @@ pub(crate) fn verify(args: &VerifyArgs) -> GenericResult
 }
 
 #[derive(Args, Debug)]
+pub(crate) struct VerifyPlatformArgs
+{
+    /// filename with the token to verify
+    #[arg(short, long)]
+    input: String,
+    /// filename with the public cpak
+    #[arg(short, long)]
+    key: String,
+}
+
+pub(crate) fn verify_platform(args: &VerifyPlatformArgs) -> GenericResult
+{
+    let token = tools::file_read(&args.input)?;
+    let key = tools::file_read(&args.key)?;
+    tools::verify_print_platform(&token, &key)?;
+    Ok(())
+}
+
+#[derive(Args, Debug)]
 pub(crate) struct VerifyCArgs
 {
     /// filename with the token to verify

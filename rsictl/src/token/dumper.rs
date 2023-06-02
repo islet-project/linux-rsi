@@ -51,7 +51,7 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose wrapper\n", token_type);
 }
 
-pub fn print_token(claims: &AttestationClaims)
+fn print_token_realm(claims: &RealmClaims)
 {
     print_cose_sign1("Realm", &claims.realm_cose_sign1);
     //print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
@@ -65,7 +65,10 @@ pub fn print_token(claims: &AttestationClaims)
         print_claim(claim, 1);
     }
     println!("== End of Realm Token.\n\n");
+}
 
+pub fn print_token_platform(claims: &PlatformClaims)
+{
     print_cose_sign1("Platform", &claims.plat_cose_sign1);
     //print_cose_sign1_wrapper("Platform", &claims.plat_cose_sign1_wrapper);
 
@@ -86,4 +89,10 @@ pub fn print_token(claims: &AttestationClaims)
         }
     }
     println!("== End of Platform Token\n");
+}
+
+pub fn print_token(claims: &AttestationClaims)
+{
+    print_token_realm(&claims.realm_claims);
+    print_token_platform(&claims.platform_claims);
 }

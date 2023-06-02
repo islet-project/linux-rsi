@@ -1,6 +1,7 @@
 use ciborium::{de, value::Value};
 use coset::{AsCborValue, CoseSign1};
 use p384::ecdsa::signature::Verifier;
+use sha2::{Sha256, Digest, Sha384, Sha512};
 use super::*;
 
 
@@ -90,7 +91,7 @@ fn find_claim(claims: &mut [Claim], key: i64) -> Option<&mut Claim>
 fn get_claims_from_map(map: Vec<(Value, Value)>, claims: &mut [Claim])
                        -> Result<Vec<(Value, Value)>, TokenError>
 {
-    let mut not_found = Vec::<(Value, Value)>::new();
+    let mut unknown = Vec::<(Value, Value)>::new();
 
     for (orig_key, val) in map {
         let key = unpack_i64(&orig_key)?;
@@ -99,23 +100,23 @@ fn get_claims_from_map(map: Vec<(Value, Value)>, claims: &mut [Claim])
             claim.key = key;
             get_claim(val, claim)?;
         } else {
-            not_found.push((orig_key, val));
+            unknown.push((orig_key, val));
         }
     }
 
     // return the rest if any
-    Ok(not_found)
+    Ok(unknown)
 }
 
-fn verify_realm_token(attest_claims: &mut AttestationClaims) -> Result<(), TokenError>
+fn unpack_token_realm(claims: &mut RealmClaims) -> Result<(), TokenError>
 {
-    let realm_payload = attest_claims.realm_cose_sign1.payload.as_ref()
+    let realm_payload = claims.realm_cose_sign1.payload.as_ref()
         .ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&realm_payload[..])?;
     let map = unpack_map(val, "realm token not a map")?;
 
     // main parsing
-    let rest = get_claims_from_map(map, &mut attest_claims.realm_token_claims)?;
+    let rest = get_claims_from_map(map, &mut claims.realm_token_claims)?;
 
     // there should be one element left, rems array
     if rest.len() != 1 {
@@ -132,7 +133,7 @@ fn verify_realm_token(attest_claims: &mut AttestationClaims) -> Result<(), Token
     // zip rems (Value) and claims (Claim) to easily iterate together
     let rem_map = rems
         .into_iter()
-        .zip(&mut attest_claims.realm_measurement_claims);
+        .zip(&mut claims.realm_measurement_claims);
 
     for (rem, claim) in rem_map {
         get_claim(rem, claim)?;
@@ -141,15 +142,15 @@ fn verify_realm_token(attest_claims: &mut AttestationClaims) -> Result<(), Token
     Ok(())
 }
 
-fn verify_platform_token(attest_claims: &mut AttestationClaims) -> Result<(), TokenError>
+fn unpack_token_platform(claims: &mut PlatformClaims) -> Result<(), TokenError>
 {
-    let platform_payload = attest_claims.plat_cose_sign1.payload
+    let platform_payload = claims.plat_cose_sign1.payload
         .as_ref().ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&platform_payload[..])?;
     let map = unpack_map(val, "platform token not a map")?;
 
     // main parsing
-    let rest = get_claims_from_map(map, &mut attest_claims.plat_token_claims)?;
+    let rest = get_claims_from_map(map, &mut claims.plat_token_claims)?;
 
     // there should be one element left, sw components array
     if rest.len() != 1 {
@@ -159,14 +160,14 @@ fn verify_platform_token(attest_claims: &mut AttestationClaims) -> Result<(), To
     let sw_components = rest.into_iter().next().unwrap();
     let sw_components = unpack_keyed_array(sw_components, CCA_PLAT_SW_COMPONENTS, "sw components array")?;
 
-    if sw_components.len() > attest_claims.sw_component_claims.len() {
+    if sw_components.len() > claims.sw_component_claims.len() {
         return Err(TokenError::InvalidTokenFormat("too much sw components"));
     }
 
     // zip components (Value) and claims (SwComponent) to easily iterate together
     let sw_components_zipped = sw_components
         .into_iter()
-        .zip(&mut attest_claims.sw_component_claims);
+        .zip(&mut claims.sw_component_claims);
 
     for (sw_comp, sw_comp_claim) in sw_components_zipped {
         let map = unpack_map(sw_comp, "sw component not a map")?;
@@ -191,7 +192,7 @@ fn verify_token_sign1(buf: &[u8], cose_sign1: &mut CoseSign1) -> Result<(), Toke
     Ok(())
 }
 
-fn verify_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
+fn unpack_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
 {
     let val = de::from_reader(buf)?;
     let data = unpack_tag(val, TAG_CCA_TOKEN, "cca token tag")?;
@@ -208,30 +209,83 @@ fn verify_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
     Ok((platform, realm))
 }
 
+pub fn verify_token_realm(buf: &[u8]) -> Result<RealmClaims, TokenError>
+{
+    let mut claims = RealmClaims::new();
+
+    verify_token_sign1(buf, &mut claims.realm_cose_sign1)?;
+
+    unpack_token_realm(&mut claims)?;
+
+    let realm_key = claims.realm_token_claims[4].data.get_bstr();
+    verify_coset_signature(&claims.realm_cose_sign1, realm_key, b"")?;
+
+    Ok(claims)
+}
+
+pub fn verify_token_platform(buf: &[u8], key: Option<&[u8]>) -> Result<PlatformClaims, TokenError>
+{
+    let mut claims = PlatformClaims::new();
+
+    verify_token_sign1(buf, &mut claims.plat_cose_sign1)?;
+
+    unpack_token_platform(&mut claims)?;
+
+    if let Some(platform_key) = key {
+        verify_coset_signature(&claims.plat_cose_sign1, platform_key, b"")?;
+    }
+
+    Ok(claims)
+}
+
 pub fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
 {
-    let mut attest_claims = AttestationClaims::new();
+    let (platform_token, realm_token) = unpack_cca_token(buf)?;
 
-    let (platform_token, realm_token) = verify_cca_token(&buf)?;
+    let realm_token = verify_token_realm(&realm_token)?;
+    let platform_token = verify_token_platform(&platform_token, None)?;
 
-    verify_token_sign1(&realm_token,
-                       &mut attest_claims.realm_cose_sign1)?;
-    verify_token_sign1(&platform_token,
-                       &mut attest_claims.plat_cose_sign1)?;
+    let dak_pub = realm_token.realm_token_claims[4].data.get_bstr();
+    let challenge = platform_token.plat_token_claims[0].data.get_bstr();
+    let alg = realm_token.realm_token_claims[3].data.get_text();
+    verify_platform_challenge(dak_pub, challenge, alg)?;
 
-    verify_realm_token(&mut attest_claims)?;
-    verify_platform_token(&mut attest_claims)?;
-
-    let realm_key = attest_claims.realm_token_claims[4].data.get_bstr();
-    verify_coset_signature(&attest_claims.realm_cose_sign1, realm_key, b"")?;
-
-    //let platform_key = external_source();
-    //verify_coset_signature(&attest_claims.plat_cose_sign1, platform_key, b"")?;
+    let attest_claims = AttestationClaims::new(realm_token, platform_token);
 
     Ok(attest_claims)
 }
 
 // RustCrypto verifier
+
+fn verify_platform_challenge(dak_pub: &[u8], dak_pub_hash: &[u8], alg: &str) -> Result<(), TokenError>
+{
+    let digest = match alg {
+        "sha-256" => {
+            let mut hasher = Sha256::new();
+            hasher.update(dak_pub);
+            hasher.finalize().to_vec()
+        },
+        "sha-384" => {
+            let mut hasher = Sha384::new();
+            hasher.update(dak_pub);
+            hasher.finalize().to_vec()
+        },
+        "sha-512" => {
+            let mut hasher = Sha512::new();
+            hasher.update(dak_pub);
+            hasher.finalize().to_vec()
+        },
+        _ => {
+            return Err(TokenError::InvalidTokenFormat("invalid hash algorithm"));
+        }
+    };
+
+    if digest != dak_pub_hash {
+        return Err(TokenError::InvalidTokenFormat("challenge verification failed"));
+    }
+
+    Ok(())
+}
 
 fn verify_coset_signature(cose: &CoseSign1, key: &[u8], aad: &[u8]) -> Result<(), TokenError>
 {

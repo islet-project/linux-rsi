@@ -17,6 +17,7 @@ coset = "*"
 p256 = "*"
 p384 = "*"
 ecdsa = "*"
+sha2 = "*"
 
 [build-dependencies]
 cc = "*"
