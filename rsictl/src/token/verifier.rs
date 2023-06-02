@@ -15,15 +15,6 @@ fn unpack_i64(val: &Value) -> Result<i64, TokenError>
     Err(TokenError::InvalidTokenFormat("unpack i64 failed"))
 }
 
-fn unpack_array(val: Value, err: &'static str) -> Result<Vec<Value>, TokenError>
-{
-    if let Value::Array(vec) = val {
-        Ok(vec)
-    } else {
-        Err(TokenError::InvalidTokenFormat(err))
-    }
-}
-
 fn unpack_map(val: Value, err: &'static str) -> Result<Vec<(Value, Value)>, TokenError>
 {
     if let Value::Map(v) = val {
@@ -118,7 +109,8 @@ fn get_claims_from_map(map: Vec<(Value, Value)>, claims: &mut [Claim])
 
 fn verify_realm_token(attest_claims: &mut AttestationClaims) -> Result<(), TokenError>
 {
-    let realm_payload = attest_claims.realm_cose_sign1_wrapper[1].data.get_bstr();
+    let realm_payload = attest_claims.realm_cose_sign1.payload.as_ref()
+        .ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&realm_payload[..])?;
     let map = unpack_map(val, "realm token not a map")?;
 
@@ -151,7 +143,8 @@ fn verify_realm_token(attest_claims: &mut AttestationClaims) -> Result<(), Token
 
 fn verify_platform_token(attest_claims: &mut AttestationClaims) -> Result<(), TokenError>
 {
-    let platform_payload = attest_claims.plat_cose_sign1_wrapper[1].data.get_bstr();
+    let platform_payload = attest_claims.plat_cose_sign1.payload
+        .as_ref().ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&platform_payload[..])?;
     let map = unpack_map(val, "platform token not a map")?;
 
@@ -187,34 +180,13 @@ fn verify_platform_token(attest_claims: &mut AttestationClaims) -> Result<(), To
     Ok(())
 }
 
-fn verify_token_sign1(buf: &[u8],
-                      cose_sign1: &mut CoseSign1,
-                      cose_sign1_wrapper: &mut [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER])
-                      -> Result<(), TokenError>
+fn verify_token_sign1(buf: &[u8], cose_sign1: &mut CoseSign1) -> Result<(), TokenError>
 {
     let val = de::from_reader(buf)?;
     let data = unpack_tag(val, TAG_COSE_SIGN1, "cose sign1 tag")?;
 
     // unpack with CoseSign1 for the purpose of coset verification
     *cose_sign1 = CoseSign1::from_cbor_value(data.clone())?;
-
-    // unpack manually using ciborium
-    let vec = unpack_array(data, "cose sign1 not an array")?;
-
-    if vec.len() != CLAIM_COUNT_COSE_SIGN1_WRAPPER + 1 {
-        return Err(TokenError::InvalidTokenFormat("wrong cose sign1 claim count"));
-    }
-
-    let mut iter = vec.into_iter();
-
-    // Protected header
-    get_claim(iter.next().unwrap(), &mut cose_sign1_wrapper[0])?;
-    // Unprotected header, map, may me empty (ignored)
-    iter.next().unwrap();
-    // Payload
-    get_claim(iter.next().unwrap(), &mut cose_sign1_wrapper[1])?;
-    // Signature
-    get_claim(iter.next().unwrap(), &mut cose_sign1_wrapper[2])?;
 
     Ok(())
 }
@@ -243,11 +215,9 @@ pub fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
     let (platform_token, realm_token) = verify_cca_token(&buf)?;
 
     verify_token_sign1(&realm_token,
-                       &mut attest_claims.realm_cose_sign1,
-                       &mut attest_claims.realm_cose_sign1_wrapper)?;
+                       &mut attest_claims.realm_cose_sign1)?;
     verify_token_sign1(&platform_token,
-                       &mut attest_claims.plat_cose_sign1,
-                       &mut attest_claims.plat_cose_sign1_wrapper)?;
+                       &mut attest_claims.plat_cose_sign1)?;
 
     verify_realm_token(&mut attest_claims)?;
     verify_platform_token(&mut attest_claims)?;

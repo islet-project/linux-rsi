@@ -43,7 +43,6 @@ const CCA_SW_COMP_HASH_ALGORITHM: u32 =                  6;
 
 /* Counts */
 const CLAIM_COUNT_REALM_TOKEN: usize =                   6;
-const CLAIM_COUNT_COSE_SIGN1_WRAPPER: usize =            3;
 const CLAIM_COUNT_PLATFORM_TOKEN: usize =                8;
 const CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS: usize = 4;
 const CLAIM_COUNT_SW_COMPONENT: usize =                  5;
@@ -147,11 +146,9 @@ pub struct SwComponent
 #[derive(Debug, Default)]
 pub struct AttestationClaims
 {
-    pub realm_cose_sign1_wrapper: [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER],
     pub realm_cose_sign1: CoseSign1,
     pub realm_token_claims: [Claim; CLAIM_COUNT_REALM_TOKEN],
     pub realm_measurement_claims: [Claim; CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS],
-    pub plat_cose_sign1_wrapper: [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER],
     pub plat_cose_sign1: CoseSign1,
     pub plat_token_claims: [Claim; CLAIM_COUNT_PLATFORM_TOKEN],
     pub sw_component_claims: [SwComponent; MAX_SW_COMPONENT_COUNT],
@@ -159,18 +156,9 @@ pub struct AttestationClaims
 
 impl AttestationClaims
 {
-    fn init_cose_sign1_claims(wrapper: &mut [Claim; CLAIM_COUNT_COSE_SIGN1_WRAPPER])
-    {
-        wrapper[0].init(true, ClaimData::new_bstr(), 0, "Protected header", false);
-        wrapper[1].init(true, ClaimData::new_bstr(), 0, "Token payload",    false);
-        wrapper[2].init(true, ClaimData::new_bstr(), 0, "Signature",        false);
-    }
-
     pub(crate) fn new() -> Self
     {
         let mut claims = Self::default();
-
-        Self::init_cose_sign1_claims(&mut claims.realm_cose_sign1_wrapper);
 
         claims.realm_token_claims[0].init(true, ClaimData::new_bstr(), CCA_REALM_CHALLENGE,             "Realm challenge",               false);
         claims.realm_token_claims[1].init(true, ClaimData::new_bstr(), CCA_REALM_PERSONALIZATION_VALUE, "Realm personalization value",   false);
@@ -178,8 +166,6 @@ impl AttestationClaims
         claims.realm_token_claims[3].init(true, ClaimData::new_text(), CCA_REALM_PUB_KEY_HASH_ALGO_ID,  "Realm public key hash algo id", false);
         claims.realm_token_claims[4].init(true, ClaimData::new_bstr(), CCA_REALM_PUB_KEY,               "Realm signing public key",      false);
         claims.realm_token_claims[5].init(true, ClaimData::new_bstr(), CCA_REALM_INITIAL_MEASUREMENT,   "Realm initial measurement",     false);
-
-        Self::init_cose_sign1_claims(&mut claims.plat_cose_sign1_wrapper);
 
         claims.plat_token_claims[0].init(true,  ClaimData::new_bstr(),  CCA_PLAT_CHALLENGE,            "Challange",            false);
         claims.plat_token_claims[1].init(false, ClaimData::new_text(),  CCA_PLAT_VERIFICATION_SERVICE, "Verification service", false);
