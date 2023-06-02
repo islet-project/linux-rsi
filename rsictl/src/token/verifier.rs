@@ -108,15 +108,15 @@ fn get_claims_from_map(map: Vec<(Value, Value)>, claims: &mut [Claim])
     Ok(unknown)
 }
 
-fn unpack_token_realm(claims: &mut RealmClaims) -> Result<(), TokenError>
+fn unpack_token_realm(token: &mut RealmToken) -> Result<(), TokenError>
 {
-    let realm_payload = claims.realm_cose_sign1.payload.as_ref()
+    let realm_payload = token.cose_sign1.payload.as_ref()
         .ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&realm_payload[..])?;
     let map = unpack_map(val, "realm token not a map")?;
 
     // main parsing
-    let rest = get_claims_from_map(map, &mut claims.realm_token_claims)?;
+    let rest = get_claims_from_map(map, &mut token.token_claims)?;
 
     // there should be one element left, rems array
     if rest.len() != 1 {
@@ -133,7 +133,7 @@ fn unpack_token_realm(claims: &mut RealmClaims) -> Result<(), TokenError>
     // zip rems (Value) and claims (Claim) to easily iterate together
     let rem_map = rems
         .into_iter()
-        .zip(&mut claims.realm_measurement_claims);
+        .zip(&mut token.measurement_claims);
 
     for (rem, claim) in rem_map {
         get_claim(rem, claim)?;
@@ -142,15 +142,15 @@ fn unpack_token_realm(claims: &mut RealmClaims) -> Result<(), TokenError>
     Ok(())
 }
 
-fn unpack_token_platform(claims: &mut PlatformClaims) -> Result<(), TokenError>
+fn unpack_token_platform(token: &mut PlatformToken) -> Result<(), TokenError>
 {
-    let platform_payload = claims.plat_cose_sign1.payload
-        .as_ref().ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
+    let platform_payload = token.cose_sign1.payload.as_ref()
+        .ok_or(TokenError::InvalidTokenFormat("payload empty"))?;
     let val = de::from_reader(&platform_payload[..])?;
     let map = unpack_map(val, "platform token not a map")?;
 
     // main parsing
-    let rest = get_claims_from_map(map, &mut claims.plat_token_claims)?;
+    let rest = get_claims_from_map(map, &mut token.token_claims)?;
 
     // there should be one element left, sw components array
     if rest.len() != 1 {
@@ -160,14 +160,14 @@ fn unpack_token_platform(claims: &mut PlatformClaims) -> Result<(), TokenError>
     let sw_components = rest.into_iter().next().unwrap();
     let sw_components = unpack_keyed_array(sw_components, CCA_PLAT_SW_COMPONENTS, "sw components array")?;
 
-    if sw_components.len() > claims.sw_component_claims.len() {
+    if sw_components.len() > token.sw_component_claims.len() {
         return Err(TokenError::InvalidTokenFormat("too much sw components"));
     }
 
     // zip components (Value) and claims (SwComponent) to easily iterate together
     let sw_components_zipped = sw_components
         .into_iter()
-        .zip(&mut claims.sw_component_claims);
+        .zip(&mut token.sw_component_claims);
 
     for (sw_comp, sw_comp_claim) in sw_components_zipped {
         let map = unpack_map(sw_comp, "sw component not a map")?;
@@ -209,33 +209,33 @@ fn unpack_cca_token(buf: &[u8]) -> Result<(Vec<u8>, Vec<u8>), TokenError>
     Ok((platform, realm))
 }
 
-pub fn verify_token_realm(buf: &[u8]) -> Result<RealmClaims, TokenError>
+pub fn verify_token_realm(buf: &[u8]) -> Result<RealmToken, TokenError>
 {
-    let mut claims = RealmClaims::new();
+    let mut token = RealmToken::new();
 
-    verify_token_sign1(buf, &mut claims.realm_cose_sign1)?;
+    verify_token_sign1(buf, &mut token.cose_sign1)?;
 
-    unpack_token_realm(&mut claims)?;
+    unpack_token_realm(&mut token)?;
 
-    let realm_key = claims.realm_token_claims[4].data.get_bstr();
-    verify_coset_signature(&claims.realm_cose_sign1, realm_key, b"")?;
+    let realm_key = token.token_claims[4].data.get_bstr();
+    verify_coset_signature(&token.cose_sign1, realm_key, b"")?;
 
-    Ok(claims)
+    Ok(token)
 }
 
-pub fn verify_token_platform(buf: &[u8], key: Option<&[u8]>) -> Result<PlatformClaims, TokenError>
+pub fn verify_token_platform(buf: &[u8], key: Option<&[u8]>) -> Result<PlatformToken, TokenError>
 {
-    let mut claims = PlatformClaims::new();
+    let mut token = PlatformToken::new();
 
-    verify_token_sign1(buf, &mut claims.plat_cose_sign1)?;
+    verify_token_sign1(buf, &mut token.cose_sign1)?;
 
-    unpack_token_platform(&mut claims)?;
+    unpack_token_platform(&mut token)?;
 
     if let Some(platform_key) = key {
-        verify_coset_signature(&claims.plat_cose_sign1, platform_key, b"")?;
+        verify_coset_signature(&token.cose_sign1, platform_key, b"")?;
     }
 
-    Ok(claims)
+    Ok(token)
 }
 
 pub fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
@@ -245,9 +245,9 @@ pub fn verify_token(buf: &[u8]) -> Result<AttestationClaims, TokenError>
     let realm_token = verify_token_realm(&realm_token)?;
     let platform_token = verify_token_platform(&platform_token, None)?;
 
-    let dak_pub = realm_token.realm_token_claims[4].data.get_bstr();
-    let challenge = platform_token.plat_token_claims[0].data.get_bstr();
-    let alg = realm_token.realm_token_claims[3].data.get_text();
+    let dak_pub = realm_token.token_claims[4].data.get_bstr();
+    let challenge = platform_token.token_claims[0].data.get_bstr();
+    let alg = realm_token.token_claims[3].data.get_text();
     verify_platform_challenge(dak_pub, challenge, alg)?;
 
     let attest_claims = AttestationClaims::new(realm_token, platform_token);

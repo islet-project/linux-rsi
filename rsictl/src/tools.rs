@@ -38,15 +38,15 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
 
 pub(crate) fn verify_print(token: &[u8]) -> Result<(), rsictl::TokenError>
 {
-    let claims = rsictl::verify_token(token)?;
-    rsictl::print_token(&claims);
+    let token = rsictl::verify_token(token)?;
+    rsictl::print_token(&token);
     Ok(())
 }
 
 pub(crate) fn verify_print_platform(token: &[u8], key: &[u8]) -> Result<(), rsictl::TokenError>
 {
-    let claims = rsictl::verify_token_platform(token, Some(key))?;
-    rsictl::print_token_platform(&claims);
+    let token = rsictl::verify_token_platform(token, Some(key))?;
+    rsictl::print_token_platform(&token);
     Ok(())
 }
 

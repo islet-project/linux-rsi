@@ -144,36 +144,36 @@ pub struct SwComponent
 }
 
 #[derive(Debug, Default)]
-pub struct RealmClaims
+pub struct RealmToken
 {
-    pub realm_cose_sign1: CoseSign1,
-    pub realm_token_claims: [Claim; CLAIM_COUNT_REALM_TOKEN],
-    pub realm_measurement_claims: [Claim; CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS],
+    pub cose_sign1: CoseSign1,
+    pub token_claims: [Claim; CLAIM_COUNT_REALM_TOKEN],
+    pub measurement_claims: [Claim; CLAIM_COUNT_REALM_EXTENSIBLE_MEASUREMENTS],
 }
 
 #[derive(Debug, Default)]
-pub struct PlatformClaims
+pub struct PlatformToken
 {
-    pub plat_cose_sign1: CoseSign1,
-    pub plat_token_claims: [Claim; CLAIM_COUNT_PLATFORM_TOKEN],
+    pub cose_sign1: CoseSign1,
+    pub token_claims: [Claim; CLAIM_COUNT_PLATFORM_TOKEN],
     pub sw_component_claims: [SwComponent; MAX_SW_COMPONENT_COUNT],
 }
 
-impl RealmClaims
+impl RealmToken
 {
     fn new() -> Self
     {
         let mut claims = Self::default();
 
-        claims.realm_token_claims[0].init(true, ClaimData::new_bstr(), CCA_REALM_CHALLENGE,             "Realm challenge",               false);
-        claims.realm_token_claims[1].init(true, ClaimData::new_bstr(), CCA_REALM_PERSONALIZATION_VALUE, "Realm personalization value",   false);
-        claims.realm_token_claims[2].init(true, ClaimData::new_text(), CCA_REALM_HASH_ALGO_ID,          "Realm hash algo id",            false);
-        claims.realm_token_claims[3].init(true, ClaimData::new_text(), CCA_REALM_PUB_KEY_HASH_ALGO_ID,  "Realm public key hash algo id", false);
-        claims.realm_token_claims[4].init(true, ClaimData::new_bstr(), CCA_REALM_PUB_KEY,               "Realm signing public key",      false);
-        claims.realm_token_claims[5].init(true, ClaimData::new_bstr(), CCA_REALM_INITIAL_MEASUREMENT,   "Realm initial measurement",     false);
+        claims.token_claims[0].init(true, ClaimData::new_bstr(), CCA_REALM_CHALLENGE,             "Realm challenge",               false);
+        claims.token_claims[1].init(true, ClaimData::new_bstr(), CCA_REALM_PERSONALIZATION_VALUE, "Realm personalization value",   false);
+        claims.token_claims[2].init(true, ClaimData::new_text(), CCA_REALM_HASH_ALGO_ID,          "Realm hash algo id",            false);
+        claims.token_claims[3].init(true, ClaimData::new_text(), CCA_REALM_PUB_KEY_HASH_ALGO_ID,  "Realm public key hash algo id", false);
+        claims.token_claims[4].init(true, ClaimData::new_bstr(), CCA_REALM_PUB_KEY,               "Realm signing public key",      false);
+        claims.token_claims[5].init(true, ClaimData::new_bstr(), CCA_REALM_INITIAL_MEASUREMENT,   "Realm initial measurement",     false);
 
         let mut count = 0;
-        for claim in &mut claims.realm_measurement_claims {
+        for claim in &mut claims.measurement_claims {
             claim.init(true, ClaimData::new_bstr(), count, "Realm extensible measurement", false);
             count += 1;
         }
@@ -182,20 +182,20 @@ impl RealmClaims
     }
 }
 
-impl PlatformClaims
+impl PlatformToken
 {
     fn new() -> Self
     {
         let mut claims = Self::default();
 
-        claims.plat_token_claims[0].init(true,  ClaimData::new_bstr(),  CCA_PLAT_CHALLENGE,            "Challange",            false);
-        claims.plat_token_claims[1].init(false, ClaimData::new_text(),  CCA_PLAT_VERIFICATION_SERVICE, "Verification service", false);
-        claims.plat_token_claims[2].init(true,  ClaimData::new_text(),  CCA_PLAT_PROFILE,              "Profile",              false);
-        claims.plat_token_claims[3].init(true,  ClaimData::new_bstr(),  CCA_PLAT_INSTANCE_ID,          "Instance ID",          false);
-        claims.plat_token_claims[4].init(true,  ClaimData::new_bstr(),  CCA_PLAT_IMPLEMENTATION_ID,    "Implementation ID",    false);
-        claims.plat_token_claims[5].init(true,  ClaimData::new_int64(), CCA_PLAT_SECURITY_LIFECYCLE,   "Lifecycle",            false);
-        claims.plat_token_claims[6].init(true,  ClaimData::new_bstr(),  CCA_PLAT_CONFIGURATION,        "Configuration",        false);
-        claims.plat_token_claims[7].init(true,  ClaimData::new_text(),  CCA_PLAT_HASH_ALGO_ID,         "Platform hash algo",   false);
+        claims.token_claims[0].init(true,  ClaimData::new_bstr(),  CCA_PLAT_CHALLENGE,            "Challange",            false);
+        claims.token_claims[1].init(false, ClaimData::new_text(),  CCA_PLAT_VERIFICATION_SERVICE, "Verification service", false);
+        claims.token_claims[2].init(true,  ClaimData::new_text(),  CCA_PLAT_PROFILE,              "Profile",              false);
+        claims.token_claims[3].init(true,  ClaimData::new_bstr(),  CCA_PLAT_INSTANCE_ID,          "Instance ID",          false);
+        claims.token_claims[4].init(true,  ClaimData::new_bstr(),  CCA_PLAT_IMPLEMENTATION_ID,    "Implementation ID",    false);
+        claims.token_claims[5].init(true,  ClaimData::new_int64(), CCA_PLAT_SECURITY_LIFECYCLE,   "Lifecycle",            false);
+        claims.token_claims[6].init(true,  ClaimData::new_bstr(),  CCA_PLAT_CONFIGURATION,        "Configuration",        false);
+        claims.token_claims[7].init(true,  ClaimData::new_text(),  CCA_PLAT_HASH_ALGO_ID,         "Platform hash algo",   false);
 
         for component in &mut claims.sw_component_claims {
             component.present = false;
@@ -213,13 +213,13 @@ impl PlatformClaims
 #[derive(Debug, Default)]
 pub struct AttestationClaims
 {
-    pub realm_claims: RealmClaims,
-    pub platform_claims: PlatformClaims,
+    pub realm_claims: RealmToken,
+    pub platform_claims: PlatformToken,
 }
 
 impl AttestationClaims
 {
-    fn new(realm_claims: RealmClaims, platform_claims: PlatformClaims) -> Self
+    fn new(realm_claims: RealmToken, platform_claims: PlatformToken) -> Self
     {
         Self { realm_claims, platform_claims }
     }

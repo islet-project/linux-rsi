@@ -51,29 +51,29 @@ fn print_cose_sign1_wrapper(token_type: &str,
     println!("== End of {} Token cose wrapper\n", token_type);
 }
 
-fn print_token_realm(claims: &RealmClaims)
+fn print_token_realm(claims: &RealmToken)
 {
-    print_cose_sign1("Realm", &claims.realm_cose_sign1);
+    print_cose_sign1("Realm", &claims.cose_sign1);
     //print_cose_sign1_wrapper("Realm", &claims.realm_cose_sign1_wrapper);
 
     println!("== Realm Token:");
-    for token in &claims.realm_token_claims {
+    for token in &claims.token_claims {
         print_claim(token, 0);
     }
     println!("{:COLUMN$} (#{})", "Realm measurements", CCA_REALM_EXTENSIBLE_MEASUREMENTS);
-    for claim in &claims.realm_measurement_claims {
+    for claim in &claims.measurement_claims {
         print_claim(claim, 1);
     }
     println!("== End of Realm Token.\n\n");
 }
 
-pub fn print_token_platform(claims: &PlatformClaims)
+pub fn print_token_platform(claims: &PlatformToken)
 {
-    print_cose_sign1("Platform", &claims.plat_cose_sign1);
+    print_cose_sign1("Platform", &claims.cose_sign1);
     //print_cose_sign1_wrapper("Platform", &claims.plat_cose_sign1_wrapper);
 
     println!("== Platform Token:");
-    for claim in &claims.plat_token_claims {
+    for claim in &claims.token_claims {
         print_claim(claim, 0);
     }
 
