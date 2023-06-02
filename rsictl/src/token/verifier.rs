@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use ciborium::{de, value::Value};
 use coset::{AsCborValue, CoseSign1};
 use p384::ecdsa::signature::Verifier;
@@ -320,14 +319,12 @@ impl RustCryptoVerifier
         match self.algorithm {
             SigningAlgorithm::ES256 => {
                 let key = p256::ecdsa::VerifyingKey::from_sec1_bytes(&self.key_public_raw)?;
-                let sig_hex = hex::encode(sig);
-                let sig = p256::ecdsa::Signature::from_str(&sig_hex)?;
+                let sig = p256::ecdsa::Signature::from_slice(sig)?;
                 key.verify(data, &sig)?;
             },
             SigningAlgorithm::ES384 => {
                 let key = p384::ecdsa::VerifyingKey::from_sec1_bytes(&self.key_public_raw)?;
-                let sig_hex = hex::encode(sig);
-                let sig = p384::ecdsa::Signature::from_str(&sig_hex)?;
+                let sig = p384::ecdsa::Signature::from_slice(sig)?;
                 key.verify(data, &sig)?;
             },
             SigningAlgorithm::ES512 => {
