@@ -6,7 +6,7 @@ pub(crate) type GenericResult = Result<(), Box<dyn std::error::Error>>;
 
 pub(crate) fn version() -> GenericResult
 {
-    let version = rsictl::abi_version()?;
+    let version = rust_rsi::abi_version()?;
     println!("{}.{}", version.0, version.1);
     Ok(())
 }
@@ -26,7 +26,7 @@ pub(crate) struct MeasurReadArgs
 
 pub(crate) fn measur_read(args: &MeasurReadArgs) -> GenericResult
 {
-    let data = rsictl::measurement_read(args.index)?;
+    let data = rust_rsi::measurement_read(args.index)?;
 
     match &args.output {
         Some(f) => tools::file_write(f, &data)?,
@@ -45,8 +45,8 @@ pub(crate) struct MeasurExtendArgs
     index: u32,
 
     /// length of random data to use (1-64)
-    #[arg(short, long, default_value_t = rsictl::MAX_MEASUR_LEN.into(),
-          value_parser = clap::value_parser!(u32).range(1..=rsictl::MAX_MEASUR_LEN.into()))]
+    #[arg(short, long, default_value_t = rust_rsi::MAX_MEASUR_LEN.into(),
+          value_parser = clap::value_parser!(u32).range(1..=rust_rsi::MAX_MEASUR_LEN.into()))]
     random: u32,
 
     /// filename to extend the measurement with (1-64 bytes), none to use random
@@ -61,12 +61,11 @@ pub(crate) fn measur_extend(args: &MeasurExtendArgs) -> GenericResult
         Some(f) => tools::file_read(f)?,
     };
 
-    if data.is_empty() || data.len() > rsictl::MAX_MEASUR_LEN as usize {
-        println!("Data must be within 1-64 bytes range");
-        return Err(Box::new(nix::Error::E2BIG));
+    if data.is_empty() || data.len() > rust_rsi::MAX_MEASUR_LEN as usize {
+        return Err("Data must be within 1-64 bytes range".into());
     }
 
-    rsictl::measurement_extend(args.index, &data)?;
+    rust_rsi::measurement_extend(args.index, &data)?;
 
     Ok(())
 }
@@ -86,17 +85,16 @@ pub(crate) struct AttestArgs
 pub(crate) fn attest(args: &AttestArgs) -> GenericResult
 {
     let challenge = match &args.input {
-        None => tools::random_data(rsictl::CHALLENGE_LEN as usize),
+        None => tools::random_data(rust_rsi::CHALLENGE_LEN as usize),
         Some(f) => tools::file_read(f)?,
     };
 
-    if challenge.len() != rsictl::CHALLENGE_LEN as usize {
-        println!("Challange needs to be exactly 64 bytes");
-        return Err(Box::new(nix::Error::E2BIG));
+    if challenge.len() != rust_rsi::CHALLENGE_LEN as usize {
+        return Err("Challange needs to be exactly 64 bytes".into());
     }
 
     // try_into: &Vec<u8> -> &[u8,64]
-    let token = rsictl::attestation_token(&challenge.try_into().unwrap())?;
+    let token = rust_rsi::attestation_token(&challenge.try_into().unwrap())?;
 
     match &args.output {
         None => tools::verify_print(&token)?,

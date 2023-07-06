@@ -9,19 +9,8 @@ description = "Command line interface for the RSI kernel module"
 
 [dependencies]
 clap = { version = "*", features = ["derive"] }
-nix = "*"
+rust-rsi = { git = "https://github.com/Havner/rust-rsi.git" }
 rand = "*"
-hex = "*"
-ciborium = "*"
-coset = "*"
-p256 = "*"
-p384 = "*"
-ecdsa = "*"
-sha2 = "*"
-
-[build-dependencies]
-cc = "*"
-bindgen = "*"
 
 [profile.release]
 strip = true

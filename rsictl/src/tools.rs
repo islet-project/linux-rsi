@@ -36,26 +36,26 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
     rng.sample_iter(&Standard).take(len).collect()
 }
 
-pub(crate) fn verify_print(token: &[u8]) -> Result<(), rsictl::TokenError>
+pub(crate) fn verify_print(token: &[u8]) -> Result<(), rust_rsi::TokenError>
 {
-    let token = rsictl::verify_token(token)?;
-    rsictl::print_token(&token);
+    let token = rust_rsi::verify_token(token)?;
+    rust_rsi::print_token(&token);
     Ok(())
 }
 
-pub(crate) fn verify_print_platform(token: &[u8], key: &[u8]) -> Result<(), rsictl::TokenError>
+pub(crate) fn verify_print_platform(token: &[u8], key: &[u8]) -> Result<(), rust_rsi::TokenError>
 {
-    let token = rsictl::verify_token_platform(token, Some(key))?;
-    rsictl::print_token_platform(&token);
+    let token = rust_rsi::verify_token_platform(token, Some(key))?;
+    rust_rsi::print_token_platform(&token);
     Ok(())
 }
 
-pub(crate) fn verify_print_c(token: &[u8]) -> Result<(), rsictl::CTokenError>
+pub(crate) fn verify_print_c(token: &[u8]) -> Result<(), rust_rsi::CTokenError>
 {
-    let claims = rsictl::c_verify_token(token)?;
+    let claims = rust_rsi::c_verify_token(token)?;
     print!("\n\n\n !!!!!!!!!!!!!!! C PRINT !!!!!!!!!!!!!!! \n\n\n");
-    rsictl::c_print_token(&claims);
+    rust_rsi::c_print_token(&claims);
     print!("\n\n\n !!!!!!!!!!!!!!! RUST PRINT !!!!!!!!!!!!!!! \n\n\n");
-    rsictl::c_print_token_rust(&claims);
+    rust_rsi::c_print_token_rust(&claims);
     Ok(())
 }
