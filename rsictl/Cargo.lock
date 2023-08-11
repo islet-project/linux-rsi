@@ -732,7 +732,7 @@ dependencies = [
 [[package]]
 name = "rust-rsi"
 version = "0.1.0"
-source = "git+https://github.com/Havner/rust-rsi.git#51fdee2c08d023b6eb809361935d0673035e85a1"
+source = "git+https://github.com/Havner/rust-rsi.git#ad86c7f58bec480b8423893e12f7719a34fa884a"
 dependencies = [
  "bindgen",
  "cc",

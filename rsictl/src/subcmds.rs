@@ -80,6 +80,10 @@ pub(crate) struct AttestArgs
     /// filename to write the token to, none to verify & print
     #[arg(short, long)]
     output: Option<String>,
+
+    /// filename with a CPAK public key, used only when verifying
+    #[arg(short, long)]
+    key: Option<String>,
 }
 
 pub(crate) fn attest(args: &AttestArgs) -> GenericResult
@@ -97,8 +101,11 @@ pub(crate) fn attest(args: &AttestArgs) -> GenericResult
     let token = rust_rsi::attestation_token(&challenge.try_into().unwrap())?;
 
     match &args.output {
-        None => tools::verify_print(&token)?,
         Some(f) => tools::file_write(f, &token)?,
+        None => match &args.key {
+            Some(f) => tools::verify_print(&token, Some(tools::file_read(f)?.as_slice()))?,
+            None => tools::verify_print(&token, None)?,
+        },
     }
 
     Ok(())
@@ -110,21 +117,31 @@ pub(crate) struct VerifyArgs
     /// filename with the token to verify
     #[arg(short, long)]
     input: String,
+
+    /// filename with a CPAK public key
+    #[arg(short, long)]
+    key: Option<String>,
 }
 
 pub(crate) fn verify(args: &VerifyArgs) -> GenericResult
 {
     let token = tools::file_read(&args.input)?;
-    tools::verify_print(&token)?;
+
+    match &args.key {
+        Some(f) => tools::verify_print(&token, Some(tools::file_read(f)?.as_slice()))?,
+        None => tools::verify_print(&token, None)?,
+    }
+
     Ok(())
 }
 
 #[derive(Args, Debug)]
 pub(crate) struct VerifyPlatformArgs
 {
-    /// filename with the token to verify
+    /// filename with the extracted platform token to verify
     #[arg(short, long)]
     input: String,
+
     /// filename with the public cpak
     #[arg(short, long)]
     key: String,

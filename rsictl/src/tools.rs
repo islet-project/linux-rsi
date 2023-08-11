@@ -36,9 +36,9 @@ pub(crate) fn random_data(len: usize) -> Vec<u8>
     rng.sample_iter(&Standard).take(len).collect()
 }
 
-pub(crate) fn verify_print(token: &[u8]) -> Result<(), rust_rsi::TokenError>
+pub(crate) fn verify_print(token: &[u8], key: Option<&[u8]>) -> Result<(), rust_rsi::TokenError>
 {
-    let token = rust_rsi::verify_token(token)?;
+    let token = rust_rsi::verify_token(token, key)?;
     rust_rsi::print_token(&token);
     Ok(())
 }
