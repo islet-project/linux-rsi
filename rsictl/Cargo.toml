@@ -11,6 +11,7 @@ description = "Command line interface for the RSI kernel module"
 clap = { version = "*", features = ["derive"] }
 rust-rsi = { git = "https://github.com/Havner/rust-rsi.git" }
 rand = "*"
+ratls = { git = "https://github.sec.samsung.net/m-szaknis/ratls.git" }
 
 [profile.release]
 strip = true
