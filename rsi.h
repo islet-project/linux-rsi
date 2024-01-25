@@ -8,10 +8,12 @@
 #ifndef RSI_ABI_VERSION_GET_MINOR
 #define RSI_ABI_VERSION_GET_MINOR(_version) ((_version) & 0xFFFF)
 #endif
+#define RSI_ABI_VERSION_SET(_major, _minor) (((_major) << 16) | (_minor))
+
 
 #define MAX_MEASUR_LEN  0x40
 #define CHALLENGE_LEN   0x40
-#define MAX_TOKEN_LEN   0x1000
+#define GRANULE_LEN     0x1000
 
 struct rsi_measurement
 {
@@ -24,7 +26,7 @@ struct rsi_attestation
 {
 	uint8_t challenge[CHALLENGE_LEN];
 	uint32_t token_len;
-	uint8_t token[MAX_TOKEN_LEN];
+	uint8_t token[GRANULE_LEN];
 };
 
 #define RSIIO_ABI_VERSION          _IOR('x', 190, uint32_t /*version*/)
@@ -39,5 +41,5 @@ struct rsi_attestation
  *
  * This will not be required when the module is builtin in the kernel.
  */
-extern struct realm_config __attribute((aligned(MAX_TOKEN_LEN))) config;
-extern char __attribute__((aligned(MAX_TOKEN_LEN))) rsi_page_buf[MAX_TOKEN_LEN];
+extern struct realm_config __attribute((aligned(GRANULE_LEN))) config;
+extern char __attribute__((aligned(GRANULE_LEN))) rsi_page_buf[GRANULE_LEN];

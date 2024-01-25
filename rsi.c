@@ -29,6 +29,9 @@ MODULE_DESCRIPTION("Linux RSI playground");
 static int device_major;              /* Major number assigned to our device driver */
 static int device_open_count = 0;     /* Used to prevent multiple open */
 static struct class *cls;
+#define LINUX_RSI_VERSION \
+	RSI_ABI_VERSION_SET(1, 0)         /* Version implemented by this driver */
+
 
 /* RSI attestation call consists of several arm_smc calls,
  * don't let several users interrupt eachother.
@@ -36,24 +39,60 @@ static struct class *cls;
 static DEFINE_MUTEX(attestation_call);
 
 
+static int rsi_ret_to_errno(unsigned long rsi_ret)
+{
+	switch (rsi_ret) {
+	case RSI_SUCCESS:
+		return 0;
+	case RSI_ERROR_INPUT:
+		return EFAULT;
+	case RSI_ERROR_STATE:
+		return EBADF;
+	case RSI_INCOMPLETE:
+		return 0;
+	default:
+		printk(RSI_ALERT "UNKNOWN RSI return code: %lu\n", rsi_ret);
+		return ENXIO;
+	}
+}
+
+static char *rsi_ret_to_str(unsigned long rsi_ret)
+{
+	switch (rsi_ret) {
+	case RSI_SUCCESS:
+		return "RSI_SUCCESS";
+	case RSI_ERROR_INPUT:
+		return "RSI_ERROR_INPUT";
+	case RSI_ERROR_STATE:
+		return "RSI_ERROR_STATE";
+	case RSI_INCOMPLETE:
+		return "RSI_INCOMPLETE";
+	default:
+		return "UNKNOWN RSI return code";
+	};
+}
+
 static void rsi_playground(void)
 {
 	unsigned long ret = 0;
 	bool realm = false;
-	unsigned long ver = 0;
 
-	// creative use of an API
+	// creative use of an RSI API, rsi_present is static, this is a workaround
 	realm = cc_platform_has(CC_ATTR_MEM_ENCRYPT);
 	printk(RSI_INFO "Is realm: %s\n", realm ? "true" : "false");
 
-	// version
-	ver = rsi_get_version();
-	printk(RSI_INFO "RSI version: %lu.%lu\n",
-	       RSI_ABI_VERSION_GET_MAJOR(ver), RSI_ABI_VERSION_GET_MINOR(ver));
+	// version, TODO: loading the driver should probably fail if it's unsupported
+	unsigned long lower, higher;
+	ret = rsi_get_version(LINUX_RSI_VERSION, &lower, &higher);
+	printk(RSI_INFO "RSI version, ret: %s, lower: %lu.%lu, higher: %lu.%lu\n",
+	       rsi_ret_to_str(ret),
+	       RSI_ABI_VERSION_GET_MAJOR(lower), RSI_ABI_VERSION_GET_MINOR(lower),
+	       RSI_ABI_VERSION_GET_MAJOR(higher), RSI_ABI_VERSION_GET_MINOR(higher));
 
-	// get config
+	// get config, just for info/test
 	ret = rsi_get_realm_config(&config);
-	printk(RSI_INFO "Config ret: %lu, Bits: %lX\n", ret, config.ipa_bits);
+	printk(RSI_INFO "RSI config, ret: %s, ipa_width_in_bits: %lu\n",
+	       rsi_ret_to_str(ret), config.ipa_bits);
 }
 
 #if 0
@@ -76,23 +115,6 @@ static void print_data(uint8_t *data, size_t len)
 		printk(RSI_INFO "%s\n", line);
 }
 #endif
-
-static int rsi_ret_to_errno(unsigned long rsi_ret)
-{
-	switch (rsi_ret) {
-	case RSI_SUCCESS:
-		return 0;
-	case RSI_ERROR_INPUT:
-		return EFAULT;
-	case RSI_ERROR_STATE:
-		return EBADF;
-	case RSI_INCOMPLETE:
-		return 0;
-	default:
-		printk(RSI_ALERT "unknown ret code returned from RSI: %lu\n", rsi_ret);
-		return ENXIO;
-	}
-}
 
 /*
  * Chardev
@@ -122,6 +144,25 @@ static int device_release(struct inode *i, struct file *f)
 	return 0;
 }
 
+static int do_version(uint32_t *version)
+{
+	struct arm_smccc_1_2_regs input = {0}, output = {0};
+
+	input.a0 = SMC_RSI_ABI_VERSION;
+	input.a1 = RSI_ABI_VERSION;
+	arm_smccc_1_2_smc(&input, &output);
+
+	printk(RSI_INFO "RSI version, ret: %s\n",
+	       rsi_ret_to_str(output.a0));
+
+	if (output.a0 != RSI_SUCCESS)
+		return -rsi_ret_to_errno(output.a0);
+
+	*version = output.a1;
+
+	return 0;
+}
+
 static int do_measurement_read(struct rsi_measurement *measur)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
@@ -130,10 +171,13 @@ static int do_measurement_read(struct rsi_measurement *measur)
 	input.a1 = measur->index;
 	arm_smccc_1_2_smc(&input, &output);
 
+	printk(RSI_INFO "RSI measurement read, ret: %s\n",
+	       rsi_ret_to_str(output.a0));
+
 	if (output.a0 != RSI_SUCCESS)
 		return -rsi_ret_to_errno(output.a0);
 
-	measur->data_len = sizeof(output.a1) * 8;
+	measur->data_len = sizeof(output.a1) * 8; // 512 bits always returned, padded with 0
 	memcpy(measur->data, (uint8_t*)&output.a1, measur->data_len);
 
 	return 0;
@@ -155,45 +199,66 @@ static int do_measurement_extend(struct rsi_measurement *measur)
 
 	arm_smccc_1_2_smc(&input, &output);
 
-	if (output.a0 != RSI_SUCCESS)
-		return -rsi_ret_to_errno(output.a0);
+	printk(RSI_INFO "RSI measurement extend, ret: %s\n",
+	       rsi_ret_to_str(output.a0));
 
-	return 0;
+	return -rsi_ret_to_errno(output.a0);
 }
 
-static int do_attestation_init(phys_addr_t page, struct rsi_attestation *attest)
+static int do_attestation_init(struct rsi_attestation *attest)
 {
 	struct arm_smccc_1_2_regs input = {0}, output = {0};
 
 	input.a0 = SMC_RSI_ATTESTATION_TOKEN_INIT;
-	input.a1 = page;
-	memcpy((uint8_t*)&input.a2, attest->challenge, sizeof(attest->challenge));
+	memcpy((uint8_t*)&input.a1, attest->challenge, sizeof(attest->challenge));
 
 	arm_smccc_1_2_smc(&input, &output);
 
-	// TODO: which is correct?
-	if (output.a0 == RSI_INCOMPLETE || output.a0 == RSI_SUCCESS)
-		return 0;
-	else
-		return -rsi_ret_to_errno(output.a0);
-}
+	printk(RSI_INFO "RSI attestation init, ret: %s, max_token_len: %lu\n",
+	       rsi_ret_to_str(output.a0), output.a1);
 
-static int do_attestation_continue(phys_addr_t page, struct rsi_attestation *attest)
-{
-	struct arm_smccc_1_2_regs input = {0}, output = {0};
-
-	input.a0 = SMC_RSI_ATTESTATION_TOKEN_CONTINUE;
-	input.a1 = page;
-
-	arm_smccc_1_2_smc(&input, &output);
-
-	if (output.a0 == RSI_SUCCESS) {
-		attest->token_len = output.a1;
-		return 0;  // we're done
+	// TODO: handle tokens > 4k, buffer shuffling, more alloc
+	if (output.a1 > GRANULE_LEN) {
+		printk(RSI_ALERT "We need more space for the token: %lu\n", output.a1);
+		return -EINVAL;
 	}
 
+	return -rsi_ret_to_errno(output.a0);
+}
+
+static int do_attestation_continue(phys_addr_t granule, unsigned long *read)
+{
+	struct arm_smccc_1_2_regs input = {0}, output = {0};
+	unsigned long offset = 0;
+
+	do {
+		input.a0 = SMC_RSI_ATTESTATION_TOKEN_CONTINUE;
+		input.a1 = granule;
+		input.a2 = offset;
+		input.a3 = GRANULE_LEN - offset;
+
+		arm_smccc_1_2_smc(&input, &output);
+
+		printk(RSI_INFO "RSI attestation continue, ret: %s, read: %lu\n",
+		       rsi_ret_to_str(output.a0), output.a1);
+
+		if (output.a0 != RSI_SUCCESS && output.a0 != RSI_INCOMPLETE) {
+			return -rsi_ret_to_errno(output.a0);
+		}
+
+		offset += output.a1;
+	} while (output.a0 == RSI_INCOMPLETE && offset < GRANULE_LEN);
+
+	// this iteration is done, doesn't mean we're done completely
+	*read = offset;
+
+	// we're done, read the buffer
+	if (output.a0 == RSI_SUCCESS)
+		return 0;
+
+	// run out of buffer, read it and carry on from offset 0
 	if (output.a0 == RSI_INCOMPLETE)
-		return 1;  // carry on
+		return 1;
 
 	return -rsi_ret_to_errno(output.a0);
 }
@@ -201,23 +266,29 @@ static int do_attestation_continue(phys_addr_t page, struct rsi_attestation *att
 static int do_attestation(struct rsi_attestation *attest)
 {
 	int ret;
-	phys_addr_t page = virt_to_phys(rsi_page_buf);
+	phys_addr_t granule = virt_to_phys(rsi_page_buf);
+	unsigned long read = 0;
 
 	mutex_lock(&attestation_call);
 
-	ret = do_attestation_init(page, attest);
+	ret = do_attestation_init(attest);
 	if (ret != 0)
 		goto unlock;
 
+	// fill as much into granule as possible,
+	// either till the buffer is full or we have the whole token
 	do {
-		ret = do_attestation_continue(page, attest);
+		ret = do_attestation_continue(granule, &read);
+		// TODO: handle tokens > 4k, we should shuffle the buffer
 	} while (ret == 1);
 
 unlock:
 	mutex_unlock(&attestation_call);
 
-	if (ret == 0)
+	if (ret == 0) {
+		attest->token_len = read;
 		memcpy(attest->token, rsi_page_buf, attest->token_len);
+	}
 
 	return ret;
 }
@@ -234,7 +305,10 @@ static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case RSIIO_ABI_VERSION:
 		printk(RSI_INFO "ioctl: abi_version\n");
 
-		version = (uint32_t)rsi_get_version();
+		ret = do_version(&version);
+		if (ret != 0) {
+			printk(RSI_ALERT "ioctl: version failed: %d\n", ret);
+		}
 		ret = copy_to_user((uint32_t*)arg, &version, sizeof(uint32_t));
 		if (ret != 0) {
 			printk(RSI_ALERT "ioctl: copy_to_user failed: %d\n", ret);
@@ -356,7 +430,7 @@ static int __init rsi_init(void)
 
 	printk(RSI_INFO "Chardev registered with major %d\n", device_major);
 
-	cls = class_create(THIS_MODULE, DEVICE_NAME);
+	cls = class_create(DEVICE_NAME);
 	device_create(cls, NULL, MKDEV(device_major, 0), NULL, DEVICE_NAME);
 
 	printk(RSI_INFO "Device created on /dev/%s\n", DEVICE_NAME);
