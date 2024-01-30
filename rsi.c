@@ -217,10 +217,13 @@ static int do_attestation_init(struct rsi_attestation *attest)
 	printk(RSI_INFO "RSI attestation init, ret: %s, max_token_len: %lu\n",
 	       rsi_ret_to_str(output.a0), output.a1);
 
-	// TODO: handle tokens > 4k, buffer shuffling, more alloc
-	if (output.a1 > GRANULE_LEN) {
-		printk(RSI_ALERT "We need more space for the token: %lu\n", output.a1);
-		return -EINVAL;
+	// not enough space in the buffer
+	if (output.a1 > attest->token_len) {
+		printk(RSI_ALERT "More space is needed for the token, got: %llu, need: %lu\n",
+		       attest->token_len, output.a1);
+		// return how much data is actually needed
+		attest->token_len = output.a1;
+		return -ERANGE;
 	}
 
 	return -rsi_ret_to_errno(output.a0);
@@ -265,9 +268,9 @@ static int do_attestation_continue(phys_addr_t granule, unsigned long *read)
 
 static int do_attestation(struct rsi_attestation *attest)
 {
-	int ret;
+	int ret, err;
 	phys_addr_t granule = virt_to_phys(rsi_page_buf);
-	unsigned long read = 0;
+	unsigned long total = 0;
 
 	mutex_lock(&attestation_call);
 
@@ -275,19 +278,28 @@ static int do_attestation(struct rsi_attestation *attest)
 	if (ret != 0)
 		goto unlock;
 
+	if (attest->token == NULL)
+		return -EINVAL;
+
 	// fill as much into granule as possible,
 	// either till the buffer is full or we have the whole token
 	do {
+		unsigned long read = 0;
 		ret = do_attestation_continue(granule, &read);
-		// TODO: handle tokens > 4k, we should shuffle the buffer
+		err = copy_to_user(attest->token + total, rsi_page_buf, read);
+		if (err != 0) {
+			printk(RSI_ALERT "ioctl: copy_to_user failed: %d\n", ret);
+			ret = err;
+			goto unlock;
+		}
+		total += read;
 	} while (ret == 1);
 
 unlock:
 	mutex_unlock(&attestation_call);
 
 	if (ret == 0) {
-		attest->token_len = read;
-		memcpy(attest->token, rsi_page_buf, attest->token_len);
+		attest->token_len = total;
 	}
 
 	return ret;
@@ -295,7 +307,7 @@ unlock:
 
 static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	int ret = 0;
+	int ret = 0, retry = 0;
 
 	uint32_t version = 0;
 	struct rsi_measurement *measur = NULL;
@@ -382,6 +394,10 @@ static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		printk(RSI_INFO "ioctl: attestation_token");
 
 		ret = do_attestation(attest);
+		if (ret == -ERANGE) {
+			retry = 1;
+			ret = 0;
+		}
 		if (ret != 0) {
 			printk(RSI_ALERT "ioctl: attestation failed: %d\n", ret);
 			goto end;
@@ -404,6 +420,10 @@ static long device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 end:
 	kfree(attest);
 	kfree(measur);
+
+	// token not taken, inform more space is needed
+	if (retry)
+		return -ERANGE;
 
 	return ret;
 }
