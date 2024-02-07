@@ -154,18 +154,3 @@ pub(crate) fn verify_platform(args: &VerifyPlatformArgs) -> GenericResult
     tools::verify_print_platform(&token, &key)?;
     Ok(())
 }
-
-#[derive(Args, Debug)]
-pub(crate) struct VerifyCArgs
-{
-    /// filename with the token to verify
-    #[arg(short, long)]
-    input: String,
-}
-
-pub(crate) fn verify_c(args: &VerifyCArgs) -> GenericResult
-{
-    let token = tools::file_read(&args.input)?;
-    tools::verify_print_c(&token)?;
-    Ok(())
-}
