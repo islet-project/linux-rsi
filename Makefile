@@ -1,22 +1,27 @@
-mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-current_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
-up_dir      := $(dir $(current_dir))
+# required for module and clean targets
+KERNEL_DIR ?= YOU_NEED_TO_PASS_KERNEL_DIR
+# required for install target
+SHARED_DIR ?= YOU_NEED_TO_PASS_OUTPUT_DIR
 
-export KERNEL_DIR := ${up_dir}/fvp-cca-scripts/4.linux-cca-realm
-export SHARED_DIR := ${up_dir}/fvp-cca-scripts/out/shared_dir
-export PATH := ${up_dir}/fvp-cca-scripts/toolchains/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-linux-gnu/bin:${PATH}
-export CROSS_COMPILE := aarch64-none-linux-gnu-
-export ARCH := arm64
+export CROSS_COMPILE ?= aarch64-none-linux-gnu-
+export ARCH ?= arm64
+
+# either set COMPILER_DIR manually or make sure the compiler is in PATH
+ifneq ($(origin COMPILER_DIR), undefined)
+    export PATH := ${COMPILER_DIR}:${PATH}
+endif
 
 HEADERS=rsi.h
 
 obj-m += rsi.o
 
-all: module
+all: module install
 
 module: ${HEADERS}
 	make -C ${KERNEL_DIR} M=$(PWD) modules
-	cp rsi.ko ${SHARED_DIR}
+
+install:
+	install rsi.ko ${OUTPUT_DIR}
 
 clean:
 	make -C ${KERNEL_DIR} M=$(PWD) clean
