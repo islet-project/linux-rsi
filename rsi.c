@@ -89,7 +89,7 @@ static void rsi_playground(void)
 
 	// version, TODO: loading the driver should probably fail if it's unsupported
 	unsigned long lower, higher;
-	ret = rsi_get_version(LINUX_RSI_VERSION, &lower, &higher);
+	ret = rsi_request_version(LINUX_RSI_VERSION, &lower, &higher);
 	printk(RSI_INFO "RSI version, ret: %s, lower: %lu.%lu, higher: %lu.%lu\n",
 	       rsi_ret_to_str(ret),
 	       RSI_ABI_VERSION_GET_MAJOR(lower), RSI_ABI_VERSION_GET_MINOR(lower),

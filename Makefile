@@ -1,7 +1,7 @@
 # required for module and clean targets
 KERNEL_DIR ?= YOU_NEED_TO_PASS_KERNEL_DIR
 # required for install target
-SHARED_DIR ?= YOU_NEED_TO_PASS_OUTPUT_DIR
+OUTPUT_DIR ?= YOU_NEED_TO_PASS_OUTPUT_DIR
 
 export CROSS_COMPILE ?= aarch64-none-linux-gnu-
 export ARCH ?= arm64
