@@ -18,10 +18,10 @@ obj-m += rsi.o
 all: module install
 
 module: ${HEADERS}
-	make -C ${KERNEL_DIR} M=$(PWD) modules
+	make -C ${KERNEL_DIR} M=$(CURDIR) modules
 
 install:
 	install rsi.ko ${OUTPUT_DIR}
 
 clean:
-	make -C ${KERNEL_DIR} M=$(PWD) clean
+	make -C ${KERNEL_DIR} M=$(CURDIR) clean
