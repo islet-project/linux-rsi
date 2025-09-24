@@ -21,7 +21,7 @@ module: ${HEADERS}
 	make -C ${KERNEL_DIR} M=$(CURDIR) modules
 
 install:
-	install rsi.ko ${OUTPUT_DIR}
+	install rsi.ko ${OUTPUT_DIR}/
 
 clean:
 	make -C ${KERNEL_DIR} M=$(CURDIR) clean
