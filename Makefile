@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 # required for module and clean targets
 KERNEL_DIR ?= YOU_NEED_TO_PASS_KERNEL_DIR
 # required for install target
