@@ -1,3 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
+/*
+ * Copyright (c) 2023-2026 Samsung Electronics Co., Ltd.
+ * All Rights Reserved.
+ */
+
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
